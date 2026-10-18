@@ -96,6 +96,7 @@ export async function POST(req: Request) {
       tanggal: body.tanggal || new Date().toISOString().split('T')[0],
       tujuan: body.nama_tim || body.tujuan || 'Kantor BPS',
       pemohon: body.penanggung_jawab || body.pemohon || 'Pegawai',
+      status: body.status || 'pending',
       keterangan: typeof body.keterangan === 'string' && body.keterangan.startsWith('{')
         ? body.keterangan
         : JSON.stringify({

@@ -175,6 +175,7 @@ export function parseRemoteTransaksiKeluar(rows: any[], barangList: Barang[]): T
       penanggung_jawab: meta.penanggung_jawab || r.pemohon || 'Pegawai',
       nip_pj: meta.nip_pj || '-',
       jenis_pengeluaran: meta.jenis_pengeluaran || 'habis_pakai',
+      status: (r.status as 'pending' | 'approved' | 'rejected') || 'pending',
       items,
       keterangan: meta.note || (meta.items ? '' : r.keterangan) || null,
       created_by: r.created_by || 'usr-remote',
