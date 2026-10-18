@@ -703,8 +703,8 @@ export default function LaporanPage() {
                   BERITA ACARA HASIL OPNAME PHISIK (STOCK OPNAME) PERSEDIAAN
                 </h3>
                 <p
-                  style={{ textIndent: '2.5rem' }}
-                  className="text-xs print:text-[9.5pt] text-black mb-3 print:mb-2 leading-relaxed text-justify max-w-4xl mx-auto"
+                  style={{ textIndent: '2.5rem', overflowWrap: 'break-word', wordBreak: 'break-word', width: '100%', display: 'block' }}
+                  className="text-xs print:text-[9.5pt] text-black mb-3 print:mb-2 leading-relaxed text-justify"
                 >
                   {getTeksBeritaAcaraOpname(tglCetakDokumen)}
                 </p>
@@ -713,7 +713,7 @@ export default function LaporanPage() {
               {/* TAMPILAN CETAK TABEL 1: BERITA ACARA OPNAME PHISIK (Pas 100% A4, Kolom 10 Tidak Terpotong) */}
               {activeTab === 'opname' && (
                 <table
-                  style={{ width: '100%', tableLayout: 'fixed' }}
+                  style={{ width: '100%', tableLayout: 'fixed', wordBreak: 'break-word', overflowWrap: 'break-word' }}
                   className={cn("w-full border-collapse border border-black text-[9px] print:text-[8pt] mb-4 print:mb-3", printTableFontSize)}
                 >
                   <thead>
