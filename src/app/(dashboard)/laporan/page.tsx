@@ -303,8 +303,7 @@ export default function LaporanPage() {
           ? 'print:py-1.5'
           : 'print:py-1';
 
-  const printTableFontSize =
-    rowCount <= 10 ? 'print:text-[10pt]' : rowCount <= 16 ? 'print:text-[9.5pt]' : 'print:text-[8.5pt]';
+  const printTableFontSize = 'print:text-[7pt]';
 
 
 
@@ -719,27 +718,27 @@ export default function LaporanPage() {
                   <thead>
                     <tr className="bg-gray-100 text-black font-bold text-center leading-tight">
                       <th style={{ width: '4%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">No.</th>
-                      <th style={{ width: '30%', overflow: 'hidden' }} className="border border-black px-1.5 py-1.5 text-center">Uraian Barang</th>
-                      <th style={{ width: '6%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Satuan</th>
-                      <th style={{ width: '10%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">{getSaldoAwalHeader(bulan, tahun)}</th>
+                      <th style={{ width: '26%', overflow: 'hidden' }} className="border border-black px-1.5 py-1.5 text-center">Uraian Barang</th>
+                      <th style={{ width: '7%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Satuan</th>
+                      <th style={{ width: '9%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">{getSaldoAwalHeader(bulan, tahun)}</th>
                       <th style={{ width: '8%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Pembelian</th>
-                      <th style={{ width: '10%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Transfer Masuk</th>
-                      <th style={{ width: '10%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Pengeluaran</th>
-                      <th style={{ width: '10%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Total Persediaan</th>
-                      <th style={{ width: '6%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Barang Rusak</th>
-                      <th style={{ width: '6%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Barang Usang</th>
+                      <th style={{ width: '9%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Transfer Masuk</th>
+                      <th style={{ width: '9%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Pengeluaran</th>
+                      <th style={{ width: '9%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Total Persediaan</th>
+                      <th style={{ width: '9%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Barang Rusak</th>
+                      <th style={{ width: '10%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Barang Usang</th>
                     </tr>
-                    <tr className="bg-gray-50 text-[7pt] print:text-[7pt] text-gray-700 font-semibold text-center h-4 leading-none">
+                    <tr className="bg-gray-50 text-[6pt] print:text-[6pt] text-gray-700 font-semibold text-center h-4 leading-none">
                       <th style={{ width: '4%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(1)</th>
-                      <th style={{ width: '30%' }} className="border border-black py-0.5 px-0.5 leading-none">(2)</th>
-                      <th style={{ width: '6%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(3)</th>
-                      <th style={{ width: '10%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(4)</th>
+                      <th style={{ width: '26%' }} className="border border-black py-0.5 px-0.5 leading-none">(2)</th>
+                      <th style={{ width: '7%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(3)</th>
+                      <th style={{ width: '9%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(4)</th>
                       <th style={{ width: '8%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(5)</th>
-                      <th style={{ width: '10%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(6)</th>
-                      <th style={{ width: '10%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(7)</th>
-                      <th style={{ width: '10%' }} className="border border-black py-0.5 px-0.5 text-[6pt] print:text-[6.5pt] tracking-tighter leading-none">(8)=(4)+(5)+(6)-(7)</th>
-                      <th style={{ width: '6%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(9)</th>
-                      <th style={{ width: '6%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(10)</th>
+                      <th style={{ width: '9%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(6)</th>
+                      <th style={{ width: '9%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(7)</th>
+                      <th style={{ width: '9%' }} className="border border-black py-0.5 px-0.5 leading-none">(8)=(4)+(5)+(6)-(7)</th>
+                      <th style={{ width: '9%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(9)</th>
+                      <th style={{ width: '10%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(10)</th>
                     </tr>
                   </thead>
                   <tbody>
