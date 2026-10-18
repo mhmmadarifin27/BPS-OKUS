@@ -11,7 +11,7 @@ import { mockKartuKendali, mockBarang, mockTransaksiKeluar, mockTransaksiMasuk }
 import { DATA_DAFTAR_PERSEDIAAN_PDF1, type DaftarPersediaanPDFItem } from '@/lib/data-daftar-persediaan-pdf1';
 import { TIM_PEMOHON_LIST } from '@/types';
 import type { KartuKendali, Barang, TransaksiKeluar, TransaksiMasuk } from '@/types';
-import { cn, formatDateShort, formatNumber, formatTanggalTandaTangan } from '@/lib/utils';
+import { cn, formatDateShort, formatNumber } from '@/lib/utils';
 import KopSurat from '@/components/KopSurat';
 import {
   fetchAndSyncBarang,
@@ -31,7 +31,6 @@ export default function KartuKendaliPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [previewMode, setPreviewMode] = useState<'kartu' | 'katalog' | 'daftar' | 'batch'>('kartu');
-  const [tglCetakDokumen, setTglCetakDokumen] = useState(() => new Date().toISOString().split('T')[0]);
   const [filterKategori, setFilterKategori] = useState<string>('all');
   const [filterMutasiOnly, setFilterMutasiOnly] = useState<boolean>(false);
 
@@ -567,37 +566,6 @@ export default function KartuKendaliPage() {
               })}
             </tbody>
           </table>
-        </div>
-
-        {/* Tanda Tangan Resmi Kuasa Pengguna Barang & Pengelola Persediaan (Format Lengkap BPS) */}
-        <div className="w-full flex items-start justify-between text-xs print:text-[9.5pt] text-black pt-1 print:pt-2 avoid-break print:mt-auto">
-          {/* Kolom Kiri: Mengetahui KPB */}
-          <div className="w-72 text-center flex flex-col items-center">
-            <p className="font-semibold text-black leading-tight">Mengetahui,</p>
-            <p className="font-medium text-black leading-tight">Kuasa Pengguna Barang</p>
-            <p className="font-medium text-black leading-tight">Kepala BPS Kabupaten OKU Selatan</p>
-            <div className="h-8 print:h-16" />
-            <p className="text-center">
-              <span className="font-bold border-b border-black text-black pb-0.5 inline-block">
-                Rival Abdul Jabar, S.ST., M.Si.
-              </span>
-            </p>
-            <p className="text-[10px] print:text-[8.5pt] mt-0.5 font-medium text-black text-center">NIP. 19831122 200701 1003</p>
-          </div>
-
-          {/* Kolom Kanan: Petugas Pengelola Persediaan */}
-          <div className="w-72 text-center flex flex-col items-center">
-            <p className="font-medium text-black leading-tight">{formatTanggalTandaTangan(tglCetakDokumen)}</p>
-            <p className="font-semibold text-black leading-tight">Petugas Pengelola Persediaan</p>
-            <p className="text-transparent select-none font-medium leading-tight">-</p>
-            <div className="h-8 print:h-16" />
-            <p className="text-center">
-              <span className="font-bold border-b border-black text-black pb-0.5 inline-block">
-                Guspita Karleni, S.Si
-              </span>
-            </p>
-            <p className="text-[10px] print:text-[8.5pt] mt-0.5 font-medium text-black text-center">NIP. 19970806 202521 2039</p>
-          </div>
         </div>
       </div>
     );
@@ -1247,16 +1215,6 @@ export default function KartuKendaliPage() {
                 </h2>
               </div>
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5 bg-dark-50 border border-dark-200 rounded-lg px-2.5 py-1">
-                  <span className="text-xs font-medium text-dark-600">Tanggal Dokumen:</span>
-                  <input
-                    type="date"
-                    value={tglCetakDokumen}
-                    onChange={(e) => setTglCetakDokumen(e.target.value)}
-                    className="text-xs bg-white border border-dark-300 rounded px-1.5 py-0.5 text-dark-800 focus:outline-none focus:ring-1 focus:ring-bps-blue"
-                    title="Pilih tanggal cetak dokumen"
-                  />
-                </div>
                 <button onClick={handlePrint} className="btn-primary text-xs py-2 px-3 inline-flex items-center gap-1.5">
                   <Printer className="w-4 h-4" /> Cetak Dokumen
                 </button>
@@ -1394,34 +1352,6 @@ export default function KartuKendaliPage() {
                         })}
                     </tbody>
                   </table>
-
-                  {/* Tanda Tangan Resmi Sesuai Format BPS - Garis Mengikuti Panjang Nama */}
-                  <div className="w-full flex items-start justify-between text-xs text-black mt-8 pt-2 avoid-break print:mt-6">
-                    <div className="w-72 text-center flex flex-col items-center">
-                      <p className="font-semibold text-black">Mengetahui,</p>
-                      <p className="font-medium text-black">Kuasa Pengguna Barang</p>
-                      <p className="font-medium text-black">Kepala BPS Kabupaten OKU Selatan</p>
-                      <div className="h-16" />
-                      <p className="text-center">
-                        <span className="font-bold border-b border-black text-black pb-0.5 inline-block">
-                          Rival Abdul Jabar, S.ST., M.Si.
-                        </span>
-                      </p>
-                      <p className="text-[11px] mt-1 font-medium text-black text-center">NIP. 19831122 200701 1003</p>
-                    </div>
-                    <div className="w-72 text-center flex flex-col items-center">
-                      <p className="font-medium text-black">{formatTanggalTandaTangan(tglCetakDokumen)}</p>
-                      <p className="font-semibold text-black">Petugas Pengelola Persediaan</p>
-                      <p className="text-transparent select-none font-medium">-</p>
-                      <div className="h-16" />
-                      <p className="text-center">
-                        <span className="font-bold border-b border-black text-black pb-0.5 inline-block">
-                          Guspita Karleni, S.Si
-                        </span>
-                      </p>
-                      <p className="text-[11px] mt-1 font-medium text-black text-center">NIP. 19970806 202521 2039</p>
-                    </div>
-                  </div>
                 </>
               )}
             </div>

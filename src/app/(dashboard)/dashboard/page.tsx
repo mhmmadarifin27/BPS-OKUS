@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Package,
@@ -22,7 +22,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import StatsCard from '@/components/StatsCard';
-import { mockChartData, mockBarang } from '@/lib/mock-data';
+import { mockChartData, mockBarang, mockTransaksiMasuk, mockTransaksiKeluar } from '@/lib/mock-data';
 import type { Barang, TransaksiMasuk, TransaksiKeluar } from '@/types';
 import { formatNumber, formatDateShort, cn } from '@/lib/utils';
 import {
@@ -39,11 +39,48 @@ export default function DashboardPage() {
     bidang: string;
   } | null>(null);
 
-  const [barangList, setBarangList] = useState<Barang[]>([]);
-  const [transaksiMasukList, setTransaksiMasukList] = useState<TransaksiMasuk[]>([]);
-  const [transaksiKeluarList, setTransaksiKeluarList] = useState<TransaksiKeluar[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
+  const [barangList, setBarangList] = useState<Barang[]>(() => {
+    if (typeof window !== 'undefined') {
+      const b = localStorage.getItem('sipersedia_barang_list');
+      if (b) {
+        try {
+          const parsed = JSON.parse(b);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {}
+      }
+    }
+    return mockBarang;
+  });
+
+  const [transaksiMasukList, setTransaksiMasukList] = useState<TransaksiMasuk[]>(() => {
+    if (typeof window !== 'undefined') {
+      const m = localStorage.getItem('sipersedia_transaksi_masuk');
+      if (m) {
+        try {
+          const parsed = JSON.parse(m);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {}
+      }
+    }
+    return mockTransaksiMasuk;
+  });
+
+  const [transaksiKeluarList, setTransaksiKeluarList] = useState<TransaksiKeluar[]>(() => {
+    if (typeof window !== 'undefined') {
+      const k = localStorage.getItem('sipersedia_transaksi_keluar');
+      if (k) {
+        try {
+          const parsed = JSON.parse(k);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {}
+      }
+    }
+    return mockTransaksiKeluar;
+  });
 
   useEffect(() => {
+    setIsMounted(true);
     const stored = localStorage.getItem('sipersedia_user');
     if (stored) {
       try {
@@ -137,7 +174,82 @@ export default function DashboardPage() {
   const myApprovedCount = myRequests.filter(t => t.status === 'approved' || !t.status).length;
   const myRejectedCount = myRequests.filter(t => t.status === 'rejected').length;
 
-  const chartData = mockChartData;
+  // Hitung Data Chart Trend 6 Bulan Terakhir secara dinamis dari mutasi transaksi
+  const chartData = useMemo(() => {
+    const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const now = new Date();
+    let refYear = now.getFullYear();
+    let refMonth = now.getMonth(); // 0-based
+
+    // Cek apakah ada data transaksi pada tahun/bulan yang lebih mutakhir
+    [...transaksiMasukList, ...transaksiKeluarList].forEach((t) => {
+      if (t.tanggal) {
+        const d = new Date(t.tanggal);
+        if (!isNaN(d.getTime())) {
+          if (d.getFullYear() > refYear || (d.getFullYear() === refYear && d.getMonth() > refMonth)) {
+            refYear = d.getFullYear();
+            refMonth = d.getMonth();
+          }
+        }
+      }
+    });
+
+    interface MonthBucket {
+      year: number;
+      month: number;
+      bulan: string;
+      masuk: number;
+      keluar: number;
+    }
+    const months: MonthBucket[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(refYear, refMonth - i, 1);
+      months.push({
+        year: d.getFullYear(),
+        month: d.getMonth(),
+        bulan: monthNamesShort[d.getMonth()],
+        masuk: 0,
+        keluar: 0,
+      });
+    }
+
+    // Akumulasi barang masuk
+    transaksiMasukList.forEach((t) => {
+      if (!t.tanggal) return;
+      const d = new Date(t.tanggal);
+      if (isNaN(d.getTime())) return;
+      const target = months.find((m) => m.year === d.getFullYear() && m.month === d.getMonth());
+      if (target) {
+        const qty = Array.isArray(t.items) && t.items.length > 0
+          ? t.items.reduce((acc, itm) => acc + (Number(itm.jumlah) || 0), 0)
+          : (Number((t as any).jumlah) || 0);
+        target.masuk += qty;
+      }
+    });
+
+    // Akumulasi barang keluar
+    transaksiKeluarList.forEach((t) => {
+      if (!t.tanggal || t.status === 'rejected') return;
+      const d = new Date(t.tanggal);
+      if (isNaN(d.getTime())) return;
+      const target = months.find((m) => m.year === d.getFullYear() && m.month === d.getMonth());
+      if (target) {
+        const qty = Array.isArray(t.items) && t.items.length > 0
+          ? t.items.reduce((acc, itm) => acc + (Number(itm.jumlah) || 0), 0)
+          : (Number((t as any).jumlah) || 0);
+        target.keluar += qty;
+      }
+    });
+
+    return months.map((m) => ({
+      bulan: m.bulan,
+      masuk: m.masuk,
+      keluar: m.keluar,
+    }));
+  }, [transaksiMasukList, transaksiKeluarList]);
+
+  const maxVal = Math.max(...chartData.map((d) => Math.max(d.masuk, d.keluar)), 0);
+  const yDomain: [number, number | string] = maxVal === 0 ? [0, 5] : [0, 'auto'];
 
   return (
     <div className="page-enter space-y-6">
@@ -301,35 +413,39 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            <div className="h-[280px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
-                  <defs>
-                    <linearGradient id="gradMasuk" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#005AA9" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#005AA9" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="gradKeluar" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#F5821F" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#F5821F" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis dataKey="bulan" tick={{ fontSize: 12, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #E2E8F0',
-                      borderRadius: '12px',
-                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                      fontSize: '12px',
-                    }}
-                  />
-                  <Area type="monotone" dataKey="masuk" stroke="#005AA9" strokeWidth={2.5} fill="url(#gradMasuk)" name="Barang Masuk" />
-                  <Area type="monotone" dataKey="keluar" stroke="#F5821F" strokeWidth={2.5} fill="url(#gradKeluar)" name="Barang Keluar" />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div className="h-[280px] w-full min-h-[280px]">
+              {isMounted ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 10, right: 10, bottom: 5, left: -15 }}>
+                    <defs>
+                      <linearGradient id="gradMasuk" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#005AA9" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#005AA9" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradKeluar" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#F5821F" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#F5821F" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                    <XAxis dataKey="bulan" tick={{ fontSize: 12, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+                    <YAxis domain={yDomain} allowDecimals={false} tick={{ fontSize: 12, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '12px',
+                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                        fontSize: '12px',
+                      }}
+                    />
+                    <Area type="monotone" dataKey="masuk" stroke="#005AA9" strokeWidth={2.5} fill="url(#gradMasuk)" name="Barang Masuk" />
+                    <Area type="monotone" dataKey="keluar" stroke="#F5821F" strokeWidth={2.5} fill="url(#gradKeluar)" name="Barang Keluar" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="w-full h-full bg-dark-50/50 rounded-xl animate-pulse" />
+              )}
             </div>
           </div>
 
