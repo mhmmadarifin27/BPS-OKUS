@@ -349,8 +349,6 @@
 
     th, td {
       border: 1px solid #000000 !important;
-      word-break: break-word !important;
-      overflow-wrap: break-word !important;
     }
 
     /* Cegah baris atau blok tanda tangan terpotong patah di tengah */

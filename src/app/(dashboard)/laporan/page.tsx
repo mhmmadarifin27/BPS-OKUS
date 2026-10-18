@@ -713,49 +713,48 @@ export default function LaporanPage() {
               {/* TAMPILAN CETAK TABEL 1: BERITA ACARA OPNAME PHISIK (Pas 100% A4, Kolom 10 Tidak Terpotong) */}
               {activeTab === 'opname' && (
                 <table
-                  style={{ width: '100%', tableLayout: 'fixed', wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                  style={{ width: '100%', tableLayout: 'fixed' }}
                   className={cn("w-full border-collapse border border-black text-[9px] print:text-[8pt] mb-4 print:mb-3", printTableFontSize)}
                 >
                   <thead>
                     <tr className="bg-gray-100 text-black font-bold text-center leading-tight">
-                      <th style={{ width: '4%', whiteSpace: 'nowrap' }} className="border border-black px-1 py-1.5 text-center">No.</th>
-                      <th style={{ width: '30%' }} className="border border-black px-1.5 py-1.5 text-center">Uraian Barang</th>
-                      <th style={{ width: '6%', whiteSpace: 'nowrap' }} className="border border-black px-1 py-1.5 text-center">Satuan</th>
-                      <th style={{ width: '10%' }} className="border border-black px-1 py-1.5 text-center">{getSaldoAwalHeader(bulan, tahun)}</th>
-                      <th style={{ width: '8%', whiteSpace: 'nowrap' }} className="border border-black px-1 py-1.5 text-center">Pembelian</th>
-                      <th style={{ width: '10%' }} className="border border-black px-1 py-1.5 text-center">Transfer Masuk</th>
-                      <th style={{ width: '10%', whiteSpace: 'nowrap' }} className="border border-black px-1 py-1.5 text-center">Pengeluaran</th>
-                      <th style={{ width: '10%' }} className="border border-black px-1 py-1.5 text-center">Total Persediaan</th>
-                      <th style={{ width: '6%' }} className="border border-black px-1 py-1.5 text-center">Barang Rusak</th>
-                      <th style={{ width: '6%' }} className="border border-black px-1 py-1.5 text-center">Barang Usang</th>
+                      <th style={{ width: '4%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">No.</th>
+                      <th style={{ width: '30%', overflow: 'hidden' }} className="border border-black px-1.5 py-1.5 text-center">Uraian Barang</th>
+                      <th style={{ width: '6%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Satuan</th>
+                      <th style={{ width: '10%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">{getSaldoAwalHeader(bulan, tahun)}</th>
+                      <th style={{ width: '8%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Pembelian</th>
+                      <th style={{ width: '10%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Transfer Masuk</th>
+                      <th style={{ width: '10%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Pengeluaran</th>
+                      <th style={{ width: '10%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Total Persediaan</th>
+                      <th style={{ width: '6%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Barang Rusak</th>
+                      <th style={{ width: '6%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Barang Usang</th>
                     </tr>
-                    {/* Baris penomoran (1)-(10): Ramping & Proporsional */}
                     <tr className="bg-gray-50 text-[7pt] print:text-[7pt] text-gray-700 font-semibold text-center h-4 leading-none">
-                      <th style={{ width: '4%' }} className="border border-black py-0.5 px-0.5 leading-none">(1)</th>
+                      <th style={{ width: '4%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(1)</th>
                       <th style={{ width: '30%' }} className="border border-black py-0.5 px-0.5 leading-none">(2)</th>
-                      <th style={{ width: '6%' }} className="border border-black py-0.5 px-0.5 leading-none">(3)</th>
-                      <th style={{ width: '10%' }} className="border border-black py-0.5 px-0.5 leading-none">(4)</th>
-                      <th style={{ width: '8%' }} className="border border-black py-0.5 px-0.5 leading-none">(5)</th>
-                      <th style={{ width: '10%' }} className="border border-black py-0.5 px-0.5 leading-none">(6)</th>
-                      <th style={{ width: '10%' }} className="border border-black py-0.5 px-0.5 leading-none">(7)</th>
+                      <th style={{ width: '6%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(3)</th>
+                      <th style={{ width: '10%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(4)</th>
+                      <th style={{ width: '8%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(5)</th>
+                      <th style={{ width: '10%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(6)</th>
+                      <th style={{ width: '10%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(7)</th>
                       <th style={{ width: '10%' }} className="border border-black py-0.5 px-0.5 text-[6pt] print:text-[6.5pt] tracking-tighter leading-none">(8)=(4)+(5)+(6)-(7)</th>
-                      <th style={{ width: '6%' }} className="border border-black py-0.5 px-0.5 leading-none">(9)</th>
-                      <th style={{ width: '6%' }} className="border border-black py-0.5 px-0.5 leading-none">(10)</th>
+                      <th style={{ width: '6%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(9)</th>
+                      <th style={{ width: '6%', whiteSpace: 'nowrap' }} className="border border-black py-0.5 px-0.5 leading-none">(10)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {activeReportData.map((item) => (
                       <tr key={item.no} className="text-black leading-tight">
-                        <td className="border border-black px-1 py-1 text-center font-medium">{item.no}</td>
-                        <td className="border border-black px-1.5 py-1 font-medium" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{item.uraian_barang}</td>
-                        <td className="border border-black px-1 py-1 text-center" style={{ whiteSpace: 'nowrap' }}>{item.satuan}</td>
-                        <td className="border border-black px-1 py-1 text-center" style={{ whiteSpace: 'nowrap' }}>{item.saldo_juli || '-'}</td>
-                        <td className="border border-black px-1 py-1 text-center" style={{ whiteSpace: 'nowrap' }}>{item.pembelian || '-'}</td>
-                        <td className="border border-black px-1 py-1 text-center" style={{ whiteSpace: 'nowrap' }}>{item.transfer_masuk || '-'}</td>
-                        <td className="border border-black px-1 py-1 text-center font-semibold" style={{ whiteSpace: 'nowrap' }}>{item.pengeluaran || '-'}</td>
-                        <td className="border border-black px-1 py-1 text-center font-bold" style={{ whiteSpace: 'nowrap' }}>{item.total_persediaan}</td>
-                        <td className="border border-black px-1 py-1 text-center" style={{ whiteSpace: 'nowrap' }}>{item.barang_rusak || '-'}</td>
-                        <td className="border border-black px-1 py-1 text-center" style={{ whiteSpace: 'nowrap' }}>{item.barang_usang || '-'}</td>
+                        <td style={{ whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1 text-center font-medium">{item.no}</td>
+                        <td style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }} className="border border-black px-1.5 py-1 font-medium">{item.uraian_barang}</td>
+                        <td style={{ whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1 text-center">{item.satuan}</td>
+                        <td style={{ whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1 text-center">{item.saldo_juli || '-'}</td>
+                        <td style={{ whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1 text-center">{item.pembelian || '-'}</td>
+                        <td style={{ whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1 text-center">{item.transfer_masuk || '-'}</td>
+                        <td style={{ whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1 text-center font-semibold">{item.pengeluaran || '-'}</td>
+                        <td style={{ whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1 text-center font-bold">{item.total_persediaan}</td>
+                        <td style={{ whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1 text-center">{item.barang_rusak || '-'}</td>
+                        <td style={{ whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1 text-center">{item.barang_usang || '-'}</td>
                       </tr>
                     ))}
                   </tbody>
