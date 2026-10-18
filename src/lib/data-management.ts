@@ -15,32 +15,33 @@ export function initOrMigrateStore(): boolean {
   if (typeof window === 'undefined') return false;
 
   try {
-    const currentVersion = localStorage.getItem('sipersedia_data_version');
-    if (currentVersion !== DATA_STORE_VERSION) {
-      console.log('[SIPERSEDIA] Migrasi versi data ke:', DATA_STORE_VERSION);
-      // Bersihkan transaksi lama agar user dapat menguji fitur per fitur dari nol
-      localStorage.setItem('sipersedia_transaksi_masuk', JSON.stringify([]));
-      localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify([]));
-      
-      // Setel 6 barang master perwakilan bersih
+    const existingBarang = localStorage.getItem('sipersedia_barang_list');
+    if (!existingBarang) {
       localStorage.setItem('sipersedia_barang_list', JSON.stringify(ALL_81_BARANG_BPS));
+    }
 
-      // Hapus data rekapitulasi custom/cache
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('sipersedia_laporan_data_')) {
-          localStorage.removeItem(key);
-        }
-      });
+    const existingMasuk = localStorage.getItem('sipersedia_transaksi_masuk');
+    if (!existingMasuk) {
+      localStorage.setItem('sipersedia_transaksi_masuk', JSON.stringify([]));
+    }
 
-      // Setel master kategori perwakilan
+    const existingKeluar = localStorage.getItem('sipersedia_transaksi_keluar');
+    if (!existingKeluar) {
+      localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify([]));
+    }
+
+    const existingKategori = localStorage.getItem('sipersedia_kategori_list');
+    if (!existingKategori) {
       localStorage.setItem('sipersedia_kategori_list', JSON.stringify([
         { id: 1, nama: 'Alat Tulis Kantor', deskripsi: 'Perlengkapan tulis perkantoran', jumlah_barang: 3 },
         { id: 2, nama: 'Peralatan Komputer', deskripsi: 'Perangkat keras dan aksesoris komputer', jumlah_barang: 1 },
         { id: 3, nama: 'Perlengkapan Cetakan', deskripsi: 'Formulir, buku, dan cetakan dinas', jumlah_barang: 1 },
         { id: 4, nama: 'Perlengkapan Lapangan', deskripsi: 'Perlengkapan sensus & survei lapangan', jumlah_barang: 1 },
       ]));
+    }
 
-      // Setel master satuan perwakilan
+    const existingSatuan = localStorage.getItem('sipersedia_satuan_list');
+    if (!existingSatuan) {
       localStorage.setItem('sipersedia_satuan_list', JSON.stringify([
         { id: 1, nama: 'Buah' },
         { id: 2, nama: 'Rim' },
@@ -48,18 +49,20 @@ export function initOrMigrateStore(): boolean {
         { id: 4, nama: 'Unit' },
         { id: 5, nama: 'Lusin' },
       ]));
+    }
 
-      // Setel master lokasi perwakilan
+    const existingLokasi = localStorage.getItem('sipersedia_lokasi_list');
+    if (!existingLokasi) {
       localStorage.setItem('sipersedia_lokasi_list', JSON.stringify([
         { id: 1, nama: 'Gudang ATK', deskripsi: 'Ruang penyimpanan khusus alat tulis kantor', jumlah_barang: 3 },
         { id: 2, nama: 'Rak Server', deskripsi: 'Tempat penyimpanan peralatan IT', jumlah_barang: 1 },
         { id: 3, nama: 'Ruang Arsip', deskripsi: 'Ruang penyimpanan dokumen dan cetakan', jumlah_barang: 1 },
         { id: 4, nama: 'Gudang Utama', deskripsi: 'Ruang penyimpanan utama lantai 1', jumlah_barang: 1 },
       ]));
-
-      localStorage.setItem('sipersedia_data_version', DATA_STORE_VERSION);
-      return true;
     }
+
+    localStorage.setItem('sipersedia_data_version', DATA_STORE_VERSION);
+    return true;
   } catch (e) {
     console.error('[SIPERSEDIA] Gagal inisialisasi data store:', e);
   }

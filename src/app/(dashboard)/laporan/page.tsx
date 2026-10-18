@@ -22,8 +22,6 @@ export default function LaporanPage() {
   const [tahun, setTahun] = useState(2026);
   const [activeTab, setActiveTab] = useState<'opname' | 'tim'>('opname');
   const [showPreview, setShowPreview] = useState(false);
-  const [editIdx, setEditIdx] = useState<number | null>(null);
-  const [isEditMode, setIsEditMode] = useState(false);
   const [toastNotification, setToastNotification] = useState<string | null>(null);
   // Tanggal Cetak Dinamis - default hari ini, bisa disesuaikan
   const [tglCetakDokumen, setTglCetakDokumen] = useState(() => new Date().toISOString().split('T')[0]);
@@ -155,14 +153,15 @@ export default function LaporanPage() {
               if (isMatch) {
                 const qty = Number(itm.jumlah) || 0;
                 if (t.sumber === 'Pembelian') beli += qty;
-                else transfer += qty;
+                else transfer += qty; // 'Dari Provinsi' atau 'Transfer Masuk'
               }
             });
           }
         });
 
-        // Transaksi keluar dari database / form (termasuk rusak dan usang)
+        // Transaksi keluar dari database / form (hanya yang sudah disetujui / status bukan pending/rejected)
         transaksiKeluarList.forEach(t => {
+          if (t.status === 'pending' || t.status === 'rejected') return;
           if (matchesMonthYear(t.tanggal, m, y)) {
             if (m === 8 && y === 2026 && mockTransaksiKeluar.some(mock => mock.id === t.id)) return;
             t.items?.forEach(itm => {
@@ -202,11 +201,10 @@ export default function LaporanPage() {
       let timDist = { umum: 0, sosial: 0, ipds: 0, pertanian: 0, distribusi: 0, neraca: 0, pek: 0 };
 
       if (targetTahun === 2026 && targetBulan >= 8) {
-        let runningStock = agustusBase ? agustusBase.saldo_juli : b.stok;
+        // ponytail: Jika barang resmi BPS gunakan saldo_juli, jika barang baru yang baru didaftarkan saldo awal diatur 0
+        let runningStock = agustusBase ? agustusBase.saldo_juli : 0;
 
         // Roll-forward bulan demi bulan hingga sebelum bulan target
-        // Contoh untuk bulan 10 (Oktober), roll-forward bulan 8 (Agustus) dan bulan 9 (September)
-        // sehingga runningStock adalah persis saldo akhir per 30 September 2026!
         for (let m = 8; m < targetBulan; m++) {
           const mutasi = getMonthMutasi(m, targetTahun);
           runningStock = Math.max(0, runningStock + mutasi.beli + mutasi.transfer - mutasi.keluar);
@@ -239,7 +237,7 @@ export default function LaporanPage() {
         no: i + 1,
         uraian_barang: b.nama_barang,
         satuan: b.satuan?.nama_satuan || 'Buah',
-        saldo_juli: saldoAwal, // Menyimpan nilai saldo awal periode (misal: Saldo 30 September 2026)
+        saldo_juli: saldoAwal, // Menyimpan nilai saldo awal periode
         pembelian,
         transfer_masuk: transferMasuk,
         pengeluaran,
@@ -252,7 +250,7 @@ export default function LaporanPage() {
         },
       };
     })
-      .filter(item => item.total_persediaan > 0)
+      .filter(item => item.saldo_juli > 0 || item.pembelian > 0 || item.transfer_masuk > 0 || item.pengeluaran > 0 || item.total_persediaan > 0)
       .map((item, idx) => ({
         ...item,
         no: idx + 1,
@@ -269,7 +267,6 @@ export default function LaporanPage() {
   // Handler jika ganti bulan
   const handleBulanChange = (newBulan: number) => {
     setBulan(newBulan);
-    setEditIdx(null);
     const lastDay = new Date(tahun, newBulan, 0).getDate();
     setTglCetakDokumen(`${tahun}-${String(newBulan).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`);
   };
@@ -277,7 +274,6 @@ export default function LaporanPage() {
   // Handler jika ganti tahun
   const handleTahunChange = (newTahun: number) => {
     setTahun(newTahun);
-    setEditIdx(null);
     const lastDay = new Date(newTahun, bulan, 0).getDate();
     setTglCetakDokumen(`${newTahun}-${String(bulan).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`);
   };
@@ -295,57 +291,6 @@ export default function LaporanPage() {
   const totalPersediaan = activeReportData.reduce((s, i) => s + (i.total_persediaan || 0), 0);
   const totalRusak = activeReportData.reduce((s, i) => s + (i.barang_rusak || 0), 0);
   const totalUsang = activeReportData.reduce((s, i) => s + (i.barang_usang || 0), 0);
-
-  // Edit Baris & Mode Edit Global
-  const handleEditRow = (idx: number) => {
-    setEditIdx(idx);
-  };
-
-  const handleSaveRow = () => {
-    setEditIdx(null);
-    const cleaned = reportData
-      .filter((i) => Number(i.total_persediaan || 0) > 0)
-      .map((item, idx) => ({ ...item, no: idx + 1 }));
-    setReportData(cleaned);
-    localStorage.setItem(`sipersedia_laporan_data_${bulan}_${tahun}`, JSON.stringify(cleaned));
-    setToastNotification('Perubahan baris berhasil disimpan!');
-    setTimeout(() => setToastNotification(null), 3000);
-  };
-
-  const handleToggleEditMode = () => {
-    if (isEditMode) {
-      setEditIdx(null);
-      const cleaned = reportData
-        .filter((i) => Number(i.total_persediaan || 0) > 0)
-        .map((item, idx) => ({ ...item, no: idx + 1 }));
-      setReportData(cleaned);
-      localStorage.setItem(`sipersedia_laporan_data_${bulan}_${tahun}`, JSON.stringify(cleaned));
-      setToastNotification('✅ Perubahan data laporan berhasil disimpan ke sistem!');
-      setTimeout(() => setToastNotification(null), 3500);
-    }
-    setIsEditMode(!isEditMode);
-  };
-
-  const handleResetDefault = () => {
-    localStorage.removeItem(`sipersedia_laporan_data_${bulan}_${tahun}`);
-    setReportData(getComputedReportData(bulan, tahun));
-    setIsEditMode(false);
-    setEditIdx(null);
-    setToastNotification('Data laporan dikembalikan ke nilai awal BPS.');
-    setTimeout(() => setToastNotification(null), 3500);
-  };
-
-  const handleFieldChange = (idx: number, field: keyof RekapitulasiAgustusItem, value: number) => {
-    setReportData(prev => {
-      const updated = [...prev];
-      const item = { ...updated[idx] };
-      (item as any)[field] = value;
-      // Rumus otomatis: Saldo Awal + Pembelian + Transfer Masuk - Pengeluaran
-      item.total_persediaan = (item.saldo_juli || 0) + (item.pembelian || 0) + (item.transfer_masuk || 0) - (item.pengeluaran || 0);
-      updated[idx] = item;
-      return updated;
-    });
-  };
 
   // Pengaturan Responsif Cetak agar 1 Halaman Full A4 Menyesuaikan Jumlah Baris
   const rowCount = activeReportData.length;
@@ -385,20 +330,6 @@ export default function LaporanPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {/* Tombol Edit di Sebelah Cetak (Poin 7 Revisi Mentor) */}
-            <button
-              onClick={handleToggleEditMode}
-              className={cn(
-                "btn-secondary flex items-center gap-1.5 transition-all text-xs font-bold py-2.5 px-3.5",
-                isEditMode
-                  ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-sm"
-                  : "hover:bg-dark-50 text-dark-700"
-              )}
-              title="Edit angka fisik laporan persediaan"
-            >
-              {isEditMode ? <Check className="w-4 h-4" /> : <Edit2 className="w-4 h-4 text-bps-blue" />}
-              <span>{isEditMode ? 'Simpan & Selesai Edit' : 'Edit Laporan'}</span>
-            </button>
             <button onClick={() => setShowPreview(true)} className="btn-primary">
               <Printer className="w-4 h-4" />
               Cetak {activeTab === 'opname' ? 'Berita Acara Opname' : 'Rekapitulasi Tim'}
@@ -539,53 +470,12 @@ export default function LaporanPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={handleToggleEditMode}
-                  className={cn(
-                    "btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 font-bold transition-all",
-                    isEditMode
-                      ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-sm"
-                      : "text-dark-700 hover:bg-dark-50"
-                  )}
-                  title="Edit data fisik laporan"
-                >
-                  {isEditMode ? <Check className="w-3.5 h-3.5" /> : <Edit2 className="w-3.5 h-3.5 text-bps-blue" />}
-                  <span>{isEditMode ? 'Simpan & Selesai' : 'Edit Laporan'}</span>
-                </button>
                 <button onClick={() => setShowPreview(true)} className="btn-primary text-xs py-1.5 px-3">
                   <Printer className="w-3.5 h-3.5" />
                   Cetak Berita Acara
                 </button>
               </div>
             </div>
-
-            {/* Banner Informasi Mode Edit */}
-            {isEditMode && (
-              <div className="bg-emerald-50 border-b border-emerald-200 px-5 py-3 text-xs text-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 animate-fade-in">
-                <div className="flex items-center gap-2">
-                  <Edit2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
-                  <span>
-                    <strong>Mode Edit Laporan Aktif:</strong> Anda dapat langsung mengedit angka saldo, masuk, dan keluar pada tabel. Kolom <strong>Total Persediaan</strong> otomatis terkalkulasi. Klik <strong>Simpan &amp; Selesai</strong> di sebelah tombol Cetak jika telah selesai.
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={handleResetDefault}
-                    className="text-xs text-rose-600 hover:text-rose-800 hover:underline font-semibold"
-                  >
-                    Reset ke Data Semula
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleToggleEditMode}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1 rounded-lg text-xs shadow-xs"
-                  >
-                    Simpan Semua
-                  </button>
-                </div>
-              </div>
-            )}
 
             <div className="table-container border-0 max-h-[600px] overflow-y-auto">
               <table>
@@ -601,70 +491,33 @@ export default function LaporanPage() {
                     <th className="text-center w-28 font-bold">Total Persediaan</th>
                     <th className="text-center w-20">Rusak</th>
                     <th className="text-center w-20">Usang</th>
-                    <th className="w-20 text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(isEditMode ? reportData : activeReportData).map((item, idx) => (
+                  {activeReportData.map((item, idx) => (
                     <tr key={idx} className={item.pengeluaran > 0 ? 'bg-bps-orange-50/20' : ''}>
                       <td className="text-center text-dark-400 text-xs font-semibold">{item.no}</td>
                       <td className="font-medium text-dark-800 text-xs">{item.uraian_barang}</td>
                       <td className="text-center text-dark-600 text-xs">{item.satuan}</td>
 
-                      {/* Saldo Juli */}
-                      <td className="text-center text-xs">
-                        {isEditMode || editIdx === idx ? (
-                          <input
-                            type="number"
-                            className="input w-16 text-center py-0.5 px-1 text-xs"
-                            value={item.saldo_juli}
-                            onChange={(e) => handleFieldChange(idx, 'saldo_juli', Number(e.target.value))}
-                          />
-                        ) : (
-                          item.saldo_juli || '-'
-                        )}
+                      {/* Saldo Awal */}
+                      <td className="text-center text-xs font-medium">
+                        {item.saldo_juli || '-'}
                       </td>
 
                       {/* Pembelian */}
                       <td className="text-center text-xs text-bps-blue font-semibold">
-                        {isEditMode || editIdx === idx ? (
-                          <input
-                            type="number"
-                            className="input w-16 text-center py-0.5 px-1 text-xs"
-                            value={item.pembelian}
-                            onChange={(e) => handleFieldChange(idx, 'pembelian', Number(e.target.value))}
-                          />
-                        ) : (
-                          item.pembelian || '-'
-                        )}
+                        {item.pembelian || '-'}
                       </td>
 
                       {/* Transfer Masuk */}
                       <td className="text-center text-xs text-bps-green font-semibold">
-                        {isEditMode || editIdx === idx ? (
-                          <input
-                            type="number"
-                            className="input w-16 text-center py-0.5 px-1 text-xs"
-                            value={item.transfer_masuk}
-                            onChange={(e) => handleFieldChange(idx, 'transfer_masuk', Number(e.target.value))}
-                          />
-                        ) : (
-                          item.transfer_masuk || '-'
-                        )}
+                        {item.transfer_masuk || '-'}
                       </td>
 
                       {/* Pengeluaran */}
                       <td className="text-center text-xs text-bps-orange font-bold">
-                        {isEditMode || editIdx === idx ? (
-                          <input
-                            type="number"
-                            className="input w-16 text-center py-0.5 px-1 text-xs"
-                            value={item.pengeluaran}
-                            onChange={(e) => handleFieldChange(idx, 'pengeluaran', Number(e.target.value))}
-                          />
-                        ) : (
-                          item.pengeluaran || '-'
-                        )}
+                        {item.pengeluaran || '-'}
                       </td>
 
                       {/* Total Persediaan */}
@@ -674,59 +527,12 @@ export default function LaporanPage() {
 
                       {/* Rusak */}
                       <td className="text-center text-xs text-dark-400">
-                        {isEditMode || editIdx === idx ? (
-                          <input
-                            type="number"
-                            className="input w-14 text-center py-0.5 px-1 text-xs"
-                            value={item.barang_rusak}
-                            onChange={(e) => handleFieldChange(idx, 'barang_rusak', Number(e.target.value))}
-                          />
-                        ) : (
-                          item.barang_rusak || '-'
-                        )}
+                        {item.barang_rusak || '-'}
                       </td>
 
                       {/* Usang */}
                       <td className="text-center text-xs text-dark-400">
-                        {isEditMode || editIdx === idx ? (
-                          <input
-                            type="number"
-                            className="input w-14 text-center py-0.5 px-1 text-xs"
-                            value={item.barang_usang}
-                            onChange={(e) => handleFieldChange(idx, 'barang_usang', Number(e.target.value))}
-                          />
-                        ) : (
-                          item.barang_usang || '-'
-                        )}
-                      </td>
-
-                      {/* Tombol Edit di sebelah cetak (Poin 7 Revisi) */}
-                      <td className="text-center">
-                        {editIdx === idx ? (
-                          <button
-                            onClick={handleSaveRow}
-                            className="inline-flex items-center gap-1 bg-bps-green text-white text-[11px] font-bold py-1 px-2 rounded hover:bg-bps-green-600 transition-colors shadow-sm"
-                            title="Simpan perubahan baris ini"
-                          >
-                            <Check className="w-3 h-3" /> Simpan
-                          </button>
-                        ) : isEditMode ? (
-                          <button
-                            onClick={handleSaveRow}
-                            className="inline-flex items-center gap-1 bg-emerald-600 text-white text-[10px] font-semibold py-1 px-1.5 rounded hover:bg-emerald-700 transition-colors"
-                            title="Simpan baris"
-                          >
-                            <Check className="w-3 h-3" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleEditRow(idx)}
-                            className="p-1 rounded text-dark-400 hover:bg-bps-blue-50 hover:text-bps-blue transition-colors"
-                            title="Edit baris ini"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        {item.barang_usang || '-'}
                       </td>
                     </tr>
                   ))}
@@ -741,7 +547,6 @@ export default function LaporanPage() {
                     <td className="text-center px-2 py-2 text-dark-900 font-extrabold">{formatNumber(totalPersediaan)}</td>
                     <td className="text-center px-2 py-2 text-dark-500">{totalRusak}</td>
                     <td className="text-center px-2 py-2 text-dark-500">{totalUsang}</td>
-                    <td className="text-center"></td>
                   </tr>
                 </tfoot>
               </table>

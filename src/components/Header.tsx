@@ -39,9 +39,9 @@ export default function Header({
 }: HeaderProps) {
   const router = useRouter();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileSuccessMsg, setProfileSuccessMsg] = useState('');
+  const [headerSearchQuery, setHeaderSearchQuery] = useState('');
 
   // Editable profile modal state
   const headerPhotoInputRef = useRef<HTMLInputElement>(null);
@@ -54,7 +54,6 @@ export default function Header({
   });
 
   const profileRef = useRef<HTMLDivElement>(null);
-  const notifRef = useRef<HTMLDivElement>(null);
 
   // Load current user details from localStorage
   const loadUserDetails = () => {
@@ -86,9 +85,6 @@ export default function Header({
     const handleClick = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setIsProfileOpen(false);
-      }
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setIsNotifOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -167,19 +163,38 @@ export default function Header({
             </div>
           </div>
 
-          {/* Search */}
-          <div className="hidden xl:flex items-center gap-2 bg-white/80 rounded-xl px-3 py-2 w-72 border border-amber-200/50 focus-within:border-bps-orange focus-within:ring-2 focus-within:ring-bps-orange/15 shadow-2xs transition-all">
-            <Search className="w-4 h-4 text-dark-400" />
+          {/* Search Bar Fungsional */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (headerSearchQuery.trim()) {
+                router.push(`/barang?search=${encodeURIComponent(headerSearchQuery.trim())}`);
+              }
+            }}
+            className="hidden sm:flex items-center gap-2 bg-white/90 rounded-xl px-3 py-2 w-64 md:w-80 border border-amber-200/60 focus-within:border-bps-orange focus-within:ring-2 focus-within:ring-bps-orange/20 shadow-2xs transition-all relative"
+          >
+            <Search className="w-4 h-4 text-dark-400 flex-shrink-0" />
             <input
               type="text"
-              placeholder="Cari barang, kode, transaksi..."
-              className="bg-transparent text-xs text-dark-700 placeholder:text-dark-400 focus:outline-none w-full"
+              placeholder="Cari barang atau cek sisa stok..."
+              value={headerSearchQuery}
+              onChange={(e) => setHeaderSearchQuery(e.target.value)}
+              className="bg-transparent text-xs text-dark-800 placeholder:text-dark-400 focus:outline-none w-full font-medium"
             />
-          </div>
+            {headerSearchQuery && (
+              <button
+                type="button"
+                onClick={() => setHeaderSearchQuery('')}
+                className="text-dark-400 hover:text-dark-600 p-0.5"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </form>
         </div>
 
         {/* Right side */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           {/* Role Pill Badge (Indikator Status Akun) */}
           <div
             className={cn(
@@ -193,60 +208,10 @@ export default function Header({
             <span>{userRole === 'admin' ? 'ADMINISTRATOR' : 'PEGAWAI BPS'}</span>
           </div>
 
-          {/* Notifications */}
-          <div ref={notifRef} className="relative">
-            <button
-              onClick={() => { setIsNotifOpen(!isNotifOpen); setIsProfileOpen(false); }}
-              className="relative p-2 rounded-xl text-dark-500 hover:bg-dark-50 hover:text-dark-700 transition-colors"
-            >
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-bps-orange rounded-full border-2 border-white" />
-            </button>
-
-            {isNotifOpen && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-dark-100 overflow-hidden animate-fade-in z-50">
-                <div className="p-3.5 border-b border-dark-100 flex items-center justify-between bg-dark-50/50">
-                  <h3 className="font-bold text-xs text-dark-800 uppercase tracking-wider">Notifikasi Sistem</h3>
-                  <span className="badge bg-bps-orange-100 text-bps-orange-700 text-[10px] font-bold">3 Baru</span>
-                </div>
-                <div className="max-h-64 overflow-y-auto">
-                  {notifications.map((notif) => (
-                    <div key={notif.id} className="p-3 hover:bg-dark-50 transition-colors border-b border-dark-50 last:border-0">
-                      <div className="flex items-start gap-2.5">
-                        <div className={cn(
-                          'mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0',
-                          notif.type === 'warning' ? 'bg-bps-orange-50 text-bps-orange' : 'bg-bps-blue-50 text-bps-blue'
-                        )}>
-                          <AlertTriangle className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-dark-700 font-medium leading-relaxed">{notif.message}</p>
-                          <p className="text-[10px] text-dark-400 mt-1">{notif.time}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-2 border-t border-dark-100 bg-white">
-                  <Link
-                    href="/laporan"
-                    onClick={() => setIsNotifOpen(false)}
-                    className="block w-full text-center text-xs text-bps-blue font-bold py-1.5 rounded-lg hover:bg-bps-blue-50 transition-colors"
-                  >
-                    Lihat Laporan Stok
-                  </Link>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Divider */}
-          <div className="w-px h-8 bg-dark-100 mx-0.5" />
-
           {/* Profile dropdown */}
           <div ref={profileRef} className="relative">
             <button
-              onClick={() => { setIsProfileOpen(!isProfileOpen); setIsNotifOpen(false); }}
+              onClick={() => setIsProfileOpen(!isProfileOpen)}
               className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-dark-50 transition-colors border border-transparent hover:border-dark-100"
             >
               <div className={cn(

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Users, Plus, Search, Edit2, Trash2, UserCheck, UserX, Shield, User, X,
   Mail, Building2, Camera, CheckCircle2, AlertTriangle, Save, RefreshCw,
-  Check, Lock, Upload
+  Check, Lock, Upload, KeyRound
 } from 'lucide-react';
 import { mockUsers } from '@/lib/mock-data';
 import type { User as UserType, UserRole } from '@/types';
@@ -21,6 +21,9 @@ export default function UsersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState<UserType | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<UserType | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetCandidate, setResetCandidate] = useState<UserType | null>(null);
+  const [newPassword, setNewPassword] = useState('');
   const [notification, setNotification] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -227,6 +230,34 @@ export default function UsersPage() {
     });
     setDeleteCandidate(null);
     setTimeout(() => setNotification(null), 4000);
+  };
+
+  // Reset Password User
+  const handleResetPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetCandidate) return;
+    if (newPassword.length < 6) {
+      setNotification({ type: 'error', message: 'Kata sandi baru minimal 6 karakter!' });
+      return;
+    }
+    const existingPass = localStorage.getItem('sipersedia_passwords');
+    const passObj = existingPass ? JSON.parse(existingPass) : {};
+    if (resetCandidate.email) {
+      const em = resetCandidate.email.toLowerCase();
+      passObj[em] = newPassword;
+      if (em === 'okusbps@gmail.com') passObj['okusbps'] = newPassword;
+      if (em === 'arifinkembar2@gmail.com') passObj['arifinkembar2'] = newPassword;
+    }
+    localStorage.setItem('sipersedia_passwords', JSON.stringify(passObj));
+
+    setNotification({
+      type: 'success',
+      message: `Kata sandi untuk pengguna "${resetCandidate.name}" (${resetCandidate.email}) berhasil diperbarui!`,
+    });
+    setShowResetModal(false);
+    setResetCandidate(null);
+    setNewPassword('');
+    setTimeout(() => setNotification(null), 4500);
   };
 
   // Filtered list
@@ -476,7 +507,19 @@ export default function UsersPage() {
                   className="flex-1 btn-secondary text-xs py-2 inline-flex items-center justify-center gap-1.5 font-semibold"
                 >
                   <Edit2 className="w-3.5 h-3.5 text-bps-blue" />
-                  <span>Edit User</span>
+                  <span>Edit</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setResetCandidate(u);
+                    setNewPassword('');
+                    setShowResetModal(true);
+                  }}
+                  className="px-2.5 py-2 rounded-xl text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 inline-flex items-center gap-1 transition-colors"
+                  title="Reset Kata Sandi Akun"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Reset Sandi</span>
                 </button>
                 <button
                   onClick={() => setDeleteCandidate(u)}
@@ -805,6 +848,92 @@ export default function UsersPage() {
                 <span>Ya, Hapus Pengguna</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL RESET KATA SANDI PENGGUNA                         */}
+      {/* ======================================================== */}
+      {showResetModal && resetCandidate && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-slide-in-up">
+            <div className="flex items-center justify-between pb-3 border-b border-dark-100 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-dark-800">Reset Kata Sandi</h3>
+                  <p className="text-xs text-dark-400">Atur ulang password untuk akun pengguna</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowResetModal(false);
+                  setResetCandidate(null);
+                }}
+                className="p-1 rounded-lg text-dark-400 hover:bg-dark-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div className="p-3 bg-dark-50 rounded-xl text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-dark-400">Nama Pengguna:</span>
+                  <span className="font-semibold text-dark-800">{resetCandidate.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-dark-400">Email:</span>
+                  <span className="font-mono text-dark-700">{resetCandidate.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-dark-400">Unit / Tim Permintaan:</span>
+                  <span className="font-semibold text-bps-blue">{resetCandidate.bidang}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="input-label text-xs font-semibold text-dark-700">
+                  Kata Sandi Baru <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="Masukkan minimal 6 karakter (cth: pegawai123)"
+                  className="input text-xs"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+                <p className="text-[11px] text-dark-400 mt-1">
+                  Pengguna dapat langsung masuk dengan kata sandi baru ini.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowResetModal(false);
+                    setResetCandidate(null);
+                  }}
+                  className="btn-secondary text-xs"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary text-xs inline-flex items-center gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Simpan Sandi Baru</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

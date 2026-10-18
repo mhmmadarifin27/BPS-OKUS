@@ -34,6 +34,7 @@ export async function POST(req: Request) {
         const { data: existingB } = await supabase.from('barang').select('id, stok').eq('id', bId).maybeSingle();
         if (!existingB) {
           const bInfo = item.barang || {};
+          // ponytail: stok awal barang baru di DB diset 0, penambahan murni dari loop update transaksi masuk di bawah
           await supabase.from('barang').upsert({
             id: bId,
             kode_barang: bInfo.kode_barang || `000${bId}`,
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
             id_kategori: bInfo.id_kategori || 1,
             id_satuan: bInfo.id_satuan || 1,
             id_lokasi: bInfo.id_lokasi || 1,
-            stok: typeof bInfo.stok === 'number' ? bInfo.stok : (item.jumlah || 0),
+            stok: 0,
             stok_minimum: typeof bInfo.stok_minimum === 'number' ? bInfo.stok_minimum : 5,
             deskripsi: bInfo.deskripsi || null,
             updated_at: new Date().toISOString(),
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
           id_kategori: 1,
           id_satuan: 1,
           id_lokasi: 1,
-          stok: body.jumlah || 1,
+          stok: 0,
           stok_minimum: 5,
           updated_at: new Date().toISOString(),
         });
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
           id_kategori: 1,
           id_satuan: 1,
           id_lokasi: 1,
-          stok: 10,
+          stok: 0,
           stok_minimum: 5,
         }).select('id').single();
         primaryIdBarang = createdB?.id || 1;
@@ -114,6 +115,21 @@ export async function POST(req: Request) {
     if (error) {
       console.error('[API Transaksi Masuk Error]:', error);
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    // Perbarui stok master barang di database secara langsung
+    for (const item of items) {
+      const bId = item.id_barang || item.barang?.id;
+      const qty = Number(item.jumlah) || 0;
+      if (bId && qty > 0) {
+        const { data: bRow } = await supabase.from('barang').select('id, stok').eq('id', bId).maybeSingle();
+        if (bRow) {
+          await supabase.from('barang').update({
+            stok: (Number(bRow.stok) || 0) + qty,
+            updated_at: new Date().toISOString()
+          }).eq('id', bId);
+        }
+      }
     }
 
     return NextResponse.json({ success: true, data });

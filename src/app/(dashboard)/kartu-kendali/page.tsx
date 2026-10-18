@@ -118,20 +118,29 @@ export default function KartuKendaliPage() {
     );
     const itemPdf = itemPdfByUraian || itemPdfByKode;
 
-    // Saldo awal tahun strictly ngelink dengan Saldo 1 Januari resmi BPS (bukan bulan lain)
+    // ponytail: Saldo 1 Januari resmi BPS untuk barang master awal, untuk barang baru dimulai dari 0
     const stockAwal = (targetBarang as any)?.saldo_1_januari 
       ?? (targetBarang as any)?.stok_awal 
       ?? itemPdf?.saldo_1_januari 
-      ?? (targetBarang?.stok || 0);
+      ?? 0;
+
+    const isMatch = (i: any) => {
+      if (!i) return false;
+      if (String(i.id_barang) === String(targetBarang.id)) return true;
+      if (i.barang?.id && String(i.barang.id) === String(targetBarang.id)) return true;
+      if (i.barang?.nama_barang && i.barang.nama_barang.trim().toLowerCase() === targetBarang.nama_barang.trim().toLowerCase()) return true;
+      return false;
+    };
 
     const mMasuk = transaksiMasukList
       .filter(t => {
         const year = new Date(t.tanggal).getFullYear();
         return (year === selectedYear || isNaN(year)) &&
-          t.items.some(i => i.id_barang === targetBarang.id);
+          Array.isArray(t.items) &&
+          t.items.some(isMatch);
       })
       .map(t => {
-        const itm = t.items.find(i => i.id_barang === targetBarang.id);
+        const itm = t.items?.find(isMatch);
         return {
           id: t.id,
           tanggal: t.tanggal,
@@ -145,17 +154,20 @@ export default function KartuKendaliPage() {
 
     const mKeluar = transaksiKeluarList
       .filter(t => {
+        // Hanya transaksi yang sudah disetujui admin yang memotong kartu kendali
+        if (t.status === 'pending' || t.status === 'rejected') return false;
         const year = new Date(t.tanggal).getFullYear();
         return (year === selectedYear || isNaN(year)) &&
-          t.items.some(i => i.id_barang === targetBarang.id);
+          Array.isArray(t.items) &&
+          t.items.some(isMatch);
       })
       .map(t => {
-        const itm = t.items.find(i => i.id_barang === targetBarang.id);
+        const itm = t.items?.find(isMatch);
         return {
           id: t.id,
           tanggal: t.tanggal,
           no_referensi: t.no_dokumen,
-          uraian: itm?.keterangan || t.keterangan || `Permintaan ${t.nama_tim}`,
+          uraian: itm?.keterangan || t.keterangan || `Permintaan ${t.nama_tim || ''}`,
           masuk: 0,
           keluar: Number(itm?.jumlah) || 0,
           sisa: 0,
@@ -241,32 +253,32 @@ export default function KartuKendaliPage() {
     };
   };
 
-  // Daftar kartu kendali untuk seluruh master barang (Hanya barang yang memiliki persediaan fisik > 0)
-  // Barang yang habis / stok 0 tidak dimasukkan ke kartu kendali sesuai arahan
-  const allCardsRaw = barangList.map(b => computeSingleCard(b));
+  // Daftar kartu kendali untuk seluruh master barang
+  const allCardsRaw = (barangList || []).map(b => computeSingleCard(b));
+  // Kartu barang aktif (fallback ke seluruh barang jika tidak ada yang stok > 0)
   const activeStockCards = allCardsRaw.filter(c => Number(c.sisaAkhir || 0) > 0);
-  const allCardsList = activeStockCards;
+  const allCardsList = activeStockCards.length > 0 ? activeStockCards : allCardsRaw;
 
-  // Daftar barang yang tersedia untuk dipilih (yang masih ada persediaannya)
-  const availableBarangList = allCardsList.map(c => c.barang);
-  const activeBarang = availableBarangList.find(b => b.id === selectedBarangId) || availableBarangList[0];
-  const currentCard = allCardsList.find(c => c.id === activeBarang?.id) || allCardsList[0];
+  // Daftar barang yang tersedia untuk dipilih
+  const availableBarangList = allCardsList.map(c => c.barang).filter(Boolean);
+  const activeBarang = availableBarangList.find(b => b.id === selectedBarangId) || availableBarangList[0] || (barangList[0] || mockBarang[0]);
+  const currentCard = allCardsList.find(c => c.id === activeBarang?.id) || allCardsList[0] || (allCardsRaw[0] || null);
 
-  const leftEntries = currentCard.leftEntries;
-  const rightEntries = currentCard.rightEntries;
-  const stockAwal = currentCard.stock_awal_tahun;
-  const sisaAkhir = currentCard.stock_akhir_tahun;
-  const totalMasuk = currentCard.totalMasuk;
-  const totalKeluar = currentCard.totalKeluar;
-  const totalPengeluaranTahunan = currentCard.totalPengeluaranTahunan;
-  const leftTotalMasuk = currentCard.leftTotalMasuk;
-  const leftTotalKeluar = currentCard.leftTotalKeluar;
-  const leftLastSisa = currentCard.leftLastSisa;
-  const rightTotalMasuk = currentCard.rightTotalMasuk;
-  const rightTotalKeluar = currentCard.rightTotalKeluar;
-  const activeRowCount = currentCard.activeRowCount;
-  const LEFT_CAPACITY = currentCard.LEFT_CAPACITY;
-  const getMonthlyOut = currentCard.getMonthlyOut;
+  const leftEntries = currentCard?.leftEntries || [];
+  const rightEntries = currentCard?.rightEntries || [];
+  const stockAwal = currentCard?.stock_awal_tahun || 0;
+  const sisaAkhir = currentCard?.stock_akhir_tahun || 0;
+  const totalMasuk = currentCard?.totalMasuk || 0;
+  const totalKeluar = currentCard?.totalKeluar || 0;
+  const totalPengeluaranTahunan = currentCard?.totalPengeluaranTahunan || 0;
+  const leftTotalMasuk = currentCard?.leftTotalMasuk || 0;
+  const leftTotalKeluar = currentCard?.leftTotalKeluar || 0;
+  const leftLastSisa = currentCard?.leftLastSisa || 0;
+  const rightTotalMasuk = currentCard?.rightTotalMasuk || 0;
+  const rightTotalKeluar = currentCard?.rightTotalKeluar || 0;
+  const activeRowCount = currentCard?.activeRowCount || 14;
+  const LEFT_CAPACITY = currentCard?.LEFT_CAPACITY || 13;
+  const getMonthlyOut = currentCard?.getMonthlyOut || (() => 0);
 
   const filteredAllCards = allCardsList.filter(c => {
     const matchSearch = c.nama_barang.toLowerCase().includes(searchQuery.toLowerCase()) ||

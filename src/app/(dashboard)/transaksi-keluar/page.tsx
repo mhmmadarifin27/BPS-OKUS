@@ -32,7 +32,6 @@ export default function TransaksiKeluarPage() {
   const [showPrintPreview, setShowPrintPreview] = useState<TransaksiKeluar | null>(null);
   const [tglCetakDokumen, setTglCetakDokumen] = useState(() => new Date().toISOString().split('T')[0]);
   const [editItem, setEditItem] = useState<TransaksiKeluar | null>(null);
-  const [deleteCandidate, setDeleteCandidate] = useState<TransaksiKeluar | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
 
   const [selectedTim, setSelectedTim] = useState('tim-sosial');
@@ -159,7 +158,20 @@ export default function TransaksiKeluarPage() {
 
   const handleCreateNew = () => {
     setEditItem(null);
-    setSelectedTim('tim-sosial');
+    // Link ke tim/bidang pegawai saat ini jika ada
+    const stored = localStorage.getItem('sipersedia_user');
+    let defaultTim = 'tim-sosial';
+    if (stored) {
+      try {
+        const u = JSON.parse(stored);
+        const match = TIM_PEMOHON_LIST.find(t => 
+          t.nama_tim.toLowerCase().includes((u.bidang || '').toLowerCase()) ||
+          t.penanggung_jawab.toLowerCase().includes((u.name || '').toLowerCase())
+        );
+        if (match) defaultTim = match.id;
+      } catch {}
+    }
+    setSelectedTim(defaultTim);
     setFormJenisPengeluaran('habis_pakai');
     setTglPermintaan(new Date().toISOString().split('T')[0]);
     setKeteranganPermintaan('');
@@ -169,60 +181,55 @@ export default function TransaksiKeluarPage() {
     setShowModal(true);
   };
 
-  const handleEdit = (trx: TransaksiKeluar) => {
-    setEditItem(trx);
-    setSelectedTim(trx.tim_pemohon);
-    setFormJenisPengeluaran(trx.jenis_pengeluaran || 'habis_pakai');
-    setTglPermintaan(trx.tanggal);
-    setKeteranganPermintaan(trx.keterangan || '');
-    if (trx.items && trx.items.length > 0) {
-      setFormItems(trx.items.map(item => ({
-        id_barang: item.id_barang,
-        jumlah: item.jumlah,
-        keterangan: item.keterangan || '',
-      })));
-    } else {
-      setFormItems([
-        { id_barang: mockBarang[0]?.id || 1, jumlah: 1, keterangan: '' }
-      ]);
+  // Handler Persetujuan (Approval) khusus Admin Gudang
+  const handleApprove = (trx: TransaksiKeluar) => {
+    // Kurangi stok master barang sesuai barang keluar
+    let nextBarang = [...barangList];
+    trx.items.forEach(pItem => {
+      nextBarang = nextBarang.map(b => {
+        if (b.id === pItem.id_barang) {
+          const newStock = Math.max(0, b.stok - pItem.jumlah);
+          updateBarangStockRemote(b.id, newStock);
+          return { ...b, stok: newStock };
+        }
+        return b;
+      });
+    });
+    setBarangList(nextBarang);
+    localStorage.setItem('sipersedia_barang_list', JSON.stringify(nextBarang));
+
+    const updatedTrx: TransaksiKeluar = { ...trx, status: 'approved' };
+    const updatedList = transaksiList.map(t => t.id === trx.id ? updatedTrx : t);
+    setTransaksiList(updatedList);
+    localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify(updatedList));
+    pushTransaksiKeluar(updatedTrx);
+
+    if (typeof window !== 'undefined') {
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith('sipersedia_laporan_data_')) localStorage.removeItem(k);
+      });
     }
-    setShowModal(true);
+
+    setNotification({
+      type: 'success',
+      message: `Permintaan ${trx.no_dokumen} berhasil DISETUJUI & stok persediaan telah disalurkan.`,
+    });
+    setTimeout(() => setNotification(null), 4000);
   };
 
-  const handleDelete = (trx: TransaksiKeluar) => {
-    setDeleteCandidate(trx);
-  };
+  // Handler Penolakan khusus Admin Gudang
+  const handleReject = (trx: TransaksiKeluar) => {
+    const updatedTrx: TransaksiKeluar = { ...trx, status: 'rejected' };
+    const updatedList = transaksiList.map(t => t.id === trx.id ? updatedTrx : t);
+    setTransaksiList(updatedList);
+    localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify(updatedList));
+    pushTransaksiKeluar(updatedTrx);
 
-  const confirmDelete = async () => {
-    if (deleteCandidate) {
-      const docNo = deleteCandidate.no_dokumen;
-
-      // Hapus di cloud database
-      deleteTransaksiKeluarRemote(docNo);
-
-      // Kembalikan stok master barang yang pernah dikeluarkan
-      let nextBarang = [...barangList];
-      deleteCandidate.items.forEach(itm => {
-        nextBarang = nextBarang.map(b => {
-          if (b.id === itm.id_barang) {
-            return { ...b, stok: b.stok + itm.jumlah };
-          }
-          return b;
-        });
-      });
-      setBarangList(nextBarang);
-      localStorage.setItem('sipersedia_barang_list', JSON.stringify(nextBarang));
-
-      const updated = transaksiList.filter(t => t.id !== deleteCandidate.id);
-      setTransaksiList(updated);
-      localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify(updated));
-      setDeleteCandidate(null);
-      setNotification({
-        type: 'success',
-        message: `Surat permintaan ${docNo} berhasil dihapus & stok barang dikembalikan.`,
-      });
-      setTimeout(() => setNotification(null), 4000);
-    }
+    setNotification({
+      type: 'info',
+      message: `Permintaan ${trx.no_dokumen} telah DITOLAK.`,
+    });
+    setTimeout(() => setNotification(null), 4000);
   };
 
   const handleAddItemRow = () => {
@@ -289,118 +296,44 @@ export default function TransaksiKeluarPage() {
       };
     });
 
-    if (editItem) {
-      // Hitung selisih stok untuk setiap barang saat diedit
-      let nextBarang = [...barangList];
-
-      // 1. Kembalikan dulu stok lama dari transaksi sebelum diedit
-      editItem.items.forEach(oldItm => {
-        nextBarang = nextBarang.map(b => {
-          if (b.id === oldItm.id_barang) {
-            return { ...b, stok: b.stok + oldItm.jumlah };
-          }
-          return b;
-        });
-      });
-
-      // 2. Kurangi dengan jumlah baru yang sudah divalidasi
-      preparedItems.forEach(newItm => {
-        nextBarang = nextBarang.map(b => {
-          if (b.id === newItm.id_barang) {
-            const finalStock = Math.max(0, b.stok - newItm.jumlah);
-            updateBarangStockRemote(b.id, finalStock);
-            return { ...b, stok: finalStock };
-          }
-          return b;
-        });
-      });
-
-      setBarangList(nextBarang);
-      localStorage.setItem('sipersedia_barang_list', JSON.stringify(nextBarang));
-
-      const updatedTrx: TransaksiKeluar = {
-        ...editItem,
-        tanggal: tglPermintaan,
-        tim_pemohon: timObj.id,
-        nama_tim: timObj.nama_tim,
-        penanggung_jawab: timObj.penanggung_jawab,
-        nip_pj: timObj.nip_pj,
-        jenis_pengeluaran: formJenisPengeluaran,
-        items: preparedItems,
-        keterangan: (keteranganPermintaan || '').trim(),
-      };
-      const updatedList = transaksiList.map(t => t.id === editItem.id ? updatedTrx : t);
-      setTransaksiList(updatedList);
-      localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify(updatedList));
-
-      // Kirim pembaruan ke cloud
-      pushTransaksiKeluar(updatedTrx);
-
-      // Bersihkan cache laporan statis agar tabel laporan persediaan langsung sinkron otomatis
-      if (typeof window !== 'undefined') {
-        Object.keys(localStorage).forEach(k => {
-          if (k.startsWith('sipersedia_laporan_data_')) localStorage.removeItem(k);
-        });
-      }
-
-      setShowModal(false);
-      setNotification({
-        type: 'success',
-        message: `Surat permintaan ${editItem.no_dokumen} berhasil diperbarui dan sisa stok telah disesuaikan.`,
-      });
-      setTimeout(() => setNotification(null), 4000);
-    } else {
-      const newTrx: TransaksiKeluar = {
-        id: Date.now(),
-        no_dokumen: `BK-${new Date(tglPermintaan).getFullYear()}/${String(new Date(tglPermintaan).getMonth() + 1).padStart(2, '0')}/${String(transaksiList.length + 1).padStart(3, '0')}`,
-        tanggal: tglPermintaan,
-        tim_pemohon: timObj.id,
-        nama_tim: timObj.nama_tim,
-        penanggung_jawab: timObj.penanggung_jawab,
-        nip_pj: timObj.nip_pj,
-        jenis_pengeluaran: formJenisPengeluaran,
-        items: preparedItems,
-        keterangan: (keteranganPermintaan || '').trim(),
-        created_by: 'usr-001',
-        created_at: new Date().toISOString(),
-      };
-      const updatedList = [newTrx, ...transaksiList];
-      setTransaksiList(updatedList);
-      localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify(updatedList));
-
-      // Kirim transaksi ke cloud database agar langsung muncul di laptop admin & pegawai lain
-      pushTransaksiKeluar(newTrx);
-
-      // Kurangi stok master barang sesuai jumlah barang keluar (Lokal & Cloud)
-      let nextBarang = [...barangList];
-      preparedItems.forEach(pItem => {
-        nextBarang = nextBarang.map(b => {
-          if (b.id === pItem.id_barang) {
-            const newStock = Math.max(0, b.stok - pItem.jumlah);
-            updateBarangStockRemote(b.id, newStock);
-            return { ...b, stok: newStock };
-          }
-          return b;
-        });
-      });
-      setBarangList(nextBarang);
-      localStorage.setItem('sipersedia_barang_list', JSON.stringify(nextBarang));
-
-      // Bersihkan cache laporan statis
-      if (typeof window !== 'undefined') {
-        Object.keys(localStorage).forEach(k => {
-          if (k.startsWith('sipersedia_laporan_data_')) localStorage.removeItem(k);
-        });
-      }
-
-      setShowModal(false);
-      setNotification({
-        type: 'success',
-        message: `Surat permintaan ${newTrx.no_dokumen} berhasil diajukan dan stok persediaan telah disesuaikan.`,
-      });
-      setTimeout(() => setNotification(null), 4000);
-      setShowPrintPreview(newTrx);
+    const stored = localStorage.getItem('sipersedia_user');
+    let currentUserName = 'Pegawai BPS';
+    if (stored) {
+      try {
+        const u = JSON.parse(stored);
+        if (u.name) currentUserName = u.name;
+      } catch {}
     }
+
+    const newTrx: TransaksiKeluar = {
+      id: Date.now(),
+      no_dokumen: `BK-${new Date(tglPermintaan).getFullYear()}/${String(new Date(tglPermintaan).getMonth() + 1).padStart(2, '0')}/${String(transaksiList.length + 1).padStart(3, '0')}`,
+      tanggal: tglPermintaan,
+      tim_pemohon: timObj.id,
+      nama_tim: timObj.nama_tim,
+      penanggung_jawab: timObj.penanggung_jawab,
+      nip_pj: timObj.nip_pj,
+      jenis_pengeluaran: formJenisPengeluaran,
+      status: 'pending',
+      items: preparedItems,
+      keterangan: (keteranganPermintaan || '').trim(),
+      created_by: currentUserName,
+      created_at: new Date().toISOString(),
+    };
+    const updatedList = [newTrx, ...transaksiList];
+    setTransaksiList(updatedList);
+    localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify(updatedList));
+
+    // Kirim transaksi ke cloud database
+    pushTransaksiKeluar(newTrx);
+
+    setShowModal(false);
+    setNotification({
+      type: 'success',
+      message: `Surat permintaan ${newTrx.no_dokumen} berhasil diajukan! Menunggu persetujuan dari Admin Gudang.`,
+    });
+    setTimeout(() => setNotification(null), 4000);
+    setShowPrintPreview(newTrx);
   };
 
   const handlePrint = () => {
@@ -420,22 +353,24 @@ export default function TransaksiKeluarPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-dark-800">
-            {isUser ? 'Permintaan Barang (SPB)' : 'Pengeluaran / Pemakaian Barang'}
+            {isUser ? 'Permintaan Barang (SPB)' : 'Pengeluaran / Verifikasi Permintaan'}
           </h1>
           <p className="text-sm text-dark-400 mt-1">
             {isUser
               ? 'Ajukan permohonan ATK/cetakan dan cetak Surat Permintaan Barang untuk pengambilan'
-              : 'Verifikasi, persetujuan, dan pencatatan barang keluar dari gudang persediaan'}
+              : 'Verifikasi dan persetujuan pengeluaran barang dari gudang atas permintaan pegawai'}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleCreateNew}
-            className="btn-primary"
-          >
-            <Plus className="w-4 h-4" />
-            {isUser ? 'Buat Surat Permintaan' : 'Catat Pengeluaran'}
-          </button>
+          {isUser && (
+            <button
+              onClick={handleCreateNew}
+              className="btn-primary"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Buat Surat Permintaan</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -545,22 +480,25 @@ export default function TransaksiKeluarPage() {
           <table>
             <thead>
               <tr>
-                <th>No</th>
+                <th>No. Dokumen</th>
                 <th>Nama Barang</th>
                 <th>Satuan</th>
                 <th>Jumlah</th>
-                <th>Tim Pemohon</th>
-                <th>Keterangan</th>
-                <th>Aksi / Dokumen</th>
+                <th>Pemohon & Tim</th>
+                <th>Keperluan / Status</th>
+                <th className="text-center">Aksi / Verifikasi</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((trx) => (
+              {filtered.map((trx) => {
+                const status = trx.status || 'approved';
+                return (
                 <tr key={trx.id}>
                   <td>
                     <span className="font-mono text-xs text-bps-blue font-bold">
                       {trx.no_dokumen}
                     </span>
+                    <p className="text-[11px] text-dark-400 mt-0.5">{formatDateShort(trx.tanggal)}</p>
                   </td>
                   <td>
                     <div className="space-y-1">
@@ -596,31 +534,55 @@ export default function TransaksiKeluarPage() {
                     </div>
                   </td>
                   <td>
-                    <div className="space-y-1">
-                      {trx.jenis_pengeluaran === 'rusak' && (
-                        <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-100 text-red-700 border border-red-200">
-                          Barang Rusak
-                        </span>
-                      )}
-                      {trx.jenis_pengeluaran === 'usang' && (
-                        <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                          Barang Usang
-                        </span>
-                      )}
-                      {(!trx.jenis_pengeluaran || trx.jenis_pengeluaran === 'habis_pakai') && (
-                        <span className="inline-block px-2 py-0.5 text-[10px] font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                          Habis Pakai
-                        </span>
-                      )}
+                    <div className="space-y-1.5">
+                      <div>
+                        {status === 'pending' && (
+                          <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
+                            ⏳ Menunggu Persetujuan
+                          </span>
+                        )}
+                        {status === 'approved' && (
+                          <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            ✓ Disetujui
+                          </span>
+                        )}
+                        {status === 'rejected' && (
+                          <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-rose-100 text-rose-800 border border-rose-300">
+                            ✕ Ditolak
+                          </span>
+                        )}
+                      </div>
                       {trx.items.map((item, idx) => (
                         <p key={idx} className="text-xs text-dark-400">
-                          {item.keterangan || '-'}
+                          {item.keterangan || trx.keterangan || '-'}
                         </p>
                       ))}
                     </div>
                   </td>
                   <td>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                      {/* Aksi Verifikasi Admin jika status pending */}
+                      {!isUser && status === 'pending' && (
+                        <>
+                          <button
+                            onClick={() => handleApprove(trx)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition-colors"
+                            title="Setujui dan kurangi stok gudang"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Setujui</span>
+                          </button>
+                          <button
+                            onClick={() => handleReject(trx)}
+                            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors shadow-xs"
+                            title="Tolak permintaan"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>Tolak</span>
+                          </button>
+                        </>
+                      )}
+
                       {/* Tombol Cetak Surat Permintaan Barang */}
                       <button
                         onClick={() => setShowPrintPreview(trx)}
@@ -630,30 +592,11 @@ export default function TransaksiKeluarPage() {
                         <Printer className="w-3.5 h-3.5" />
                         <span>Cetak Surat</span>
                       </button>
-
-                      {/* Tombol Edit — Aktif untuk role Pegawai dan Admin */}
-                      <button
-                        onClick={() => handleEdit(trx)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors shadow-xs"
-                        title="Edit Surat Permintaan"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                        <span>Edit</span>
-                      </button>
-
-                      {/* Tombol Hapus — Aktif untuk role Pegawai dan Admin */}
-                      <button
-                        onClick={() => handleDelete(trx)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors shadow-xs"
-                        title="Hapus Surat Permintaan"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Hapus</span>
-                      </button>
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={7} className="text-center py-12">
@@ -881,62 +824,6 @@ export default function TransaksiKeluarPage() {
                 {editItem
                   ? 'Simpan Perubahan'
                   : (isUser ? 'Simpan & Siapkan Cetak Surat' : 'Simpan Pengeluaran')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Konfirmasi Hapus */}
-      {deleteCandidate && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-slide-in-up">
-            <div className="flex items-center gap-3 text-red-600 mb-4">
-              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-dark-800">
-                  {isUser ? 'Hapus Surat Permintaan' : 'Hapus Dokumen Pengeluaran'}
-                </h3>
-                <p className="text-xs text-dark-400">Konfirmasi tindakan penghapusan</p>
-              </div>
-            </div>
-
-            <p className="text-sm text-dark-600 mb-4">
-              Apakah Anda yakin ingin menghapus surat permintaan{' '}
-              <span className="font-bold text-dark-800 font-mono">{deleteCandidate.no_dokumen}</span> untuk{' '}
-              <span className="font-semibold text-dark-800">{deleteCandidate.nama_tim}</span>?
-            </p>
-
-            <div className="bg-dark-50 rounded-xl p-3 mb-6 text-xs text-dark-500 space-y-1">
-              <div className="flex justify-between">
-                <span>Tanggal Permintaan:</span>
-                <span className="font-semibold text-dark-700">{formatDateShort(deleteCandidate.tanggal)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Penanggung Jawab:</span>
-                <span className="font-semibold text-dark-700">{deleteCandidate.penanggung_jawab}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Jumlah Macam Barang:</span>
-                <span className="font-semibold text-dark-700">{deleteCandidate.items.length} item</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3">
-              <button
-                onClick={() => setDeleteCandidate(null)}
-                className="btn-secondary text-xs"
-              >
-                Batal
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-700 flex items-center gap-1.5 transition-colors shadow-sm"
-              >
-                <Trash2 className="w-4 h-4" />
-                Ya, Hapus
               </button>
             </div>
           </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  Package, Plus, Search, Edit2, Trash2, ArrowUpFromLine,
+  Package, Plus, Search, Trash2, ArrowUpFromLine,
   ChevronLeft, ChevronRight, X, Eye, CheckCircle2,
   AlertTriangle, Filter, Check, Clock, Layers, Printer, FileText
 } from 'lucide-react';
@@ -22,7 +22,7 @@ import {
 export default function BarangPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterKategori, setFilterKategori] = useState('');
-  const [filterStok, setFilterStok] = useState<'' | 'aman' | 'menipis' | 'habis'>('');
+  const [filterStok, setFilterStok] = useState<'' | 'tersedia' | 'habis'>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(6); // Default 6 agar 11 item menghasilkan 2 halaman persis screenshot
   const [userRole, setUserRole] = useState<'admin' | 'user'>('admin');
@@ -110,6 +110,13 @@ export default function BarangPage() {
       } catch (e) {
         console.error(e);
       }
+    }
+
+    // Ambil kata kunci pencarian dari URL jika diarahkan dari Header Search
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const q = urlParams.get('search');
+      if (q) setSearchQuery(q);
     }
 
     // Load barang dari localStorage jika ada
@@ -349,10 +356,8 @@ export default function BarangPage() {
     let matchStok = true;
     if (filterStok === 'habis') {
       matchStok = b.stok === 0;
-    } else if (filterStok === 'menipis') {
-      matchStok = b.stok > 0 && b.stok <= b.stok_minimum;
-    } else if (filterStok === 'aman') {
-      matchStok = b.stok > b.stok_minimum;
+    } else if (filterStok === 'tersedia') {
+      matchStok = b.stok > 0;
     }
 
     return matchSearch && matchKategori && matchStok;
@@ -370,8 +375,7 @@ export default function BarangPage() {
   ) as string[];
 
   // Statistik Ketersediaan Barang
-  const totalStokAman = barangList.filter((b) => b.stok > b.stok_minimum).length;
-  const totalStokMenipis = barangList.filter((b) => b.stok > 0 && b.stok <= b.stok_minimum).length;
+  const totalStokTersedia = barangList.filter((b) => b.stok > 0).length;
   const totalStokHabis = barangList.filter((b) => b.stok === 0).length;
 
   // Handler Submit Permintaan Cepat dari Katalog
@@ -495,13 +499,14 @@ export default function BarangPage() {
             <span>Formulir Permintaan ATK (SPB)</span>
           </Link>
         ) : (
-          <button
-            onClick={handleOpenAddBarang}
-            className="btn-primary inline-flex items-center gap-2"
+          <Link
+            href="/transaksi-masuk"
+            className="btn-primary inline-flex items-center gap-2 shadow-sm"
+            title="Tambah barang master baru dan stok terpusat melalui Transaksi Masuk"
           >
             <Plus className="w-4 h-4" />
-            <span>Tambah Barang</span>
-          </button>
+            <span>Tambah Barang Masuk</span>
+          </Link>
         )}
       </div>
 
@@ -531,8 +536,8 @@ export default function BarangPage() {
         </div>
       )}
 
-      {/* Quick Summary Chips Ketersediaan Barang (Sangat Berguna untuk Role Pegawai) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* Quick Summary Chips Ketersediaan Barang */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <button
           type="button"
           onClick={() => setFilterStok('')}
@@ -553,38 +558,20 @@ export default function BarangPage() {
 
         <button
           type="button"
-          onClick={() => setFilterStok('aman')}
+          onClick={() => setFilterStok('tersedia')}
           className={cn(
             'p-3 rounded-xl border text-left transition-all',
-            filterStok === 'aman'
+            filterStok === 'tersedia'
               ? 'bg-emerald-50 border-emerald-300 shadow-xs ring-1 ring-emerald-200'
               : 'bg-white border-dark-100 hover:border-dark-200'
           )}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs text-emerald-700 font-medium">Stok Aman</span>
+            <span className="text-xs text-emerald-700 font-medium">Stok Tersedia</span>
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
           </div>
-          <p className="text-xl font-bold text-emerald-700 mt-1">{totalStokAman}</p>
-          <p className="text-[11px] text-emerald-600/80">Siap diminta</p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFilterStok('menipis')}
-          className={cn(
-            'p-3 rounded-xl border text-left transition-all',
-            filterStok === 'menipis'
-              ? 'bg-amber-50 border-amber-300 shadow-xs ring-1 ring-amber-200'
-              : 'bg-white border-dark-100 hover:border-dark-200'
-          )}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-amber-700 font-medium">Stok Menipis</span>
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-          </div>
-          <p className="text-xl font-bold text-amber-700 mt-1">{totalStokMenipis}</p>
-          <p className="text-[11px] text-amber-600/80">Di bawah batas min</p>
+          <p className="text-xl font-bold text-emerald-700 mt-1">{totalStokTersedia}</p>
+          <p className="text-[11px] text-emerald-600/80">Stok fisik &gt; 0</p>
         </button>
 
         <button
@@ -602,7 +589,7 @@ export default function BarangPage() {
             <span className="w-2 h-2 rounded-full bg-red-500" />
           </div>
           <p className="text-xl font-bold text-red-700 mt-1">{totalStokHabis}</p>
-          <p className="text-[11px] text-red-600/80">Perlu pengadaan</p>
+          <p className="text-[11px] text-red-600/80">Perlu restock</p>
         </button>
       </div>
 
@@ -735,19 +722,12 @@ export default function BarangPage() {
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
                               Habis
                             </span>
-                          ) : isLowStock ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                              Menipis
-                            </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
                               Tersedia
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-dark-400">
-                          Batas min: {item.stok_minimum} {item.satuan?.nama_satuan}
-                        </p>
                       </div>
                     </td>
                     <td>
@@ -798,15 +778,6 @@ export default function BarangPage() {
                             title="Lihat Detail"
                           >
                             <Eye className="w-4 h-4" />
-                          </button>
-                          {/* Tombol Edit Barang */}
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditBarang(item)}
-                            className="p-2 rounded-lg bg-bps-blue-50 text-bps-blue hover:bg-bps-blue hover:text-white transition-all shadow-xs active:scale-95"
-                            title="Edit Barang"
-                          >
-                            <Edit2 className="w-4 h-4" />
                           </button>
                           {/* Tombol Hapus Barang */}
                           <button
@@ -1106,7 +1077,7 @@ export default function BarangPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="grid grid-cols-3 gap-3 text-xs">
                 <div className="p-3 bg-dark-50 rounded-xl space-y-1">
                   <span className="text-dark-400">Kategori:</span>
                   <p className="font-semibold text-dark-800">{detailItem.kategori?.nama_kategori}</p>
@@ -1118,12 +1089,6 @@ export default function BarangPage() {
                 <div className="p-3 bg-dark-50 rounded-xl space-y-1">
                   <span className="text-dark-400">Lokasi Penyimpanan:</span>
                   <p className="font-semibold text-dark-800">{detailItem.lokasi?.nama_lokasi}</p>
-                </div>
-                <div className="p-3 bg-dark-50 rounded-xl space-y-1">
-                  <span className="text-dark-400">Stok Minimum:</span>
-                  <p className="font-semibold text-dark-800">
-                    {detailItem.stok_minimum} {detailItem.satuan?.nama_satuan}
-                  </p>
                 </div>
               </div>
 
@@ -1142,10 +1107,6 @@ export default function BarangPage() {
                   {detailItem.stok === 0 ? (
                     <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
                       Stok Habis
-                    </span>
-                  ) : detailItem.stok <= detailItem.stok_minimum ? (
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                      Stok Menipis
                     </span>
                   ) : (
                     <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
@@ -1279,7 +1240,7 @@ export default function BarangPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="input-label text-xs font-semibold text-dark-700">
                       Lokasi Rak/Gudang <span className="text-red-500">*</span>
@@ -1306,19 +1267,6 @@ export default function BarangPage() {
                       min="0"
                       value={formStok}
                       onChange={(e) => setFormStok(Number(e.target.value))}
-                      className="input text-sm font-semibold"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="input-label text-xs font-semibold text-dark-700">
-                      Batas Stok Min (Bisa 0)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formStokMinimum}
-                      onChange={(e) => setFormStokMinimum(Number(e.target.value))}
                       className="input text-sm font-semibold"
                       placeholder="0"
                     />

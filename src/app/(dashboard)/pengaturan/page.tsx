@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import { TIM_PEMOHON_LIST, PEJABAT_KPB, PENGELOLA_PERSEDIAAN } from '@/types';
 import { resetToTestingMode, loadSimulationData, wipeAllData } from '@/lib/data-management';
+import { supabase } from '@/lib/supabase';
 
 interface UserProfile {
   id: string;
@@ -25,7 +26,7 @@ interface UserProfile {
 function PengaturanContent() {
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTab] = useState<'profil' | 'tim' | 'sistem' | 'instansi'>('profil');
+  const [activeTab, setActiveTab] = useState<'profil' | 'tim' | 'instansi'>('profil');
   const [userProfile, setUserProfile] = useState<UserProfile>({
     id: 'admin-001',
     name: 'Admin Persediaan BPS',
@@ -60,7 +61,7 @@ function PengaturanContent() {
   // Sync tab with URL search parameter
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'sistem' || tabParam === 'instansi' || tabParam === 'profil') {
+    if (tabParam === 'instansi' || tabParam === 'profil') {
       setActiveTab(tabParam as any);
     } else if (tabParam === 'tim' && userProfile.role === 'admin') {
       setActiveTab('tim');
@@ -170,7 +171,7 @@ function PengaturanContent() {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  const handleSavePassword = (e: React.FormEvent) => {
+  const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passwordForm.oldPassword) {
       setNotification({ type: 'error', message: 'Password lama wajib diisi!' });
@@ -185,43 +186,47 @@ function PengaturanContent() {
       return;
     }
 
-    setShowPasswordModal(false);
-    setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
-    setNotification({
-      type: 'success',
-      message: 'Password akun berhasil diperbarui secara aman!',
-    });
-    setTimeout(() => setNotification(null), 4000);
+    try {
+      // 1. Coba update ke Supabase Auth jika ada sesi aktif
+      const { error: sbErr } = await supabase.auth.updateUser({
+        password: passwordForm.newPassword,
+      });
+
+      if (sbErr) {
+        console.warn('[Supabase Auth]: Update password via user session:', sbErr.message);
+      }
+
+      // 2. Simpan juga ke storage lokal
+      const currentEmail = userProfile.email?.toLowerCase();
+      if (currentEmail) {
+        const stored = localStorage.getItem('sipersedia_passwords');
+        const passMap = stored ? JSON.parse(stored) : {};
+        passMap[currentEmail] = passwordForm.newPassword;
+        if (currentEmail === 'okusbps@gmail.com') passMap['okusbps'] = passwordForm.newPassword;
+        if (currentEmail === 'arifinkembar2@gmail.com') passMap['arifinkembar2'] = passwordForm.newPassword;
+        localStorage.setItem('sipersedia_passwords', JSON.stringify(passMap));
+      }
+
+      setShowPasswordModal(false);
+      setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+      setNotification({
+        type: 'success',
+        message: 'Password akun berhasil diperbarui secara aman!',
+      });
+      setTimeout(() => setNotification(null), 4000);
+    } catch (err: any) {
+      setNotification({
+        type: 'error',
+        message: err?.message || 'Gagal mengubah password!',
+      });
+      setTimeout(() => setNotification(null), 4000);
+    }
   };
 
   const handleCopyNip = (nip: string, id: string) => {
     navigator.clipboard.writeText(nip.replace(/\s+/g, ''));
     setCopiedNip(id);
     setTimeout(() => setCopiedNip(null), 2500);
-  };
-
-  const handleResetTestingData = () => {
-    if (confirm('Reset ke Mode Uji Coba Bersih?\n\n✓ 81 Master Barang resmi BPS disiapkan dengan stok baseline\n✓ Transaksi Masuk dikosongkan (0 dokumen)\n✓ Permintaan / Transaksi Keluar dikosongkan (0 dokumen)\n✓ Kartu Kendali bersih siap menerima mutasi baru\n\nLanjutkan reset?')) {
-      resetToTestingMode();
-      alert('Data persediaan berhasil di-reset ke kondisi awal siap uji coba fitur!');
-      window.location.reload();
-    }
-  };
-
-  const handleLoadSampleData = () => {
-    if (confirm('Muat kembali data simulasi lengkap (81 barang resmi BPS + contoh transaksi masuk & pengeluaran)?')) {
-      loadSimulationData();
-      alert('Data sampel simulasi resmi BPS berhasil dimuat!');
-      window.location.reload();
-    }
-  };
-
-  const handleClearAllData = () => {
-    if (confirm('PERINGATAN: Apakah Anda yakin ingin mengosongkan semua data (0 barang, 0 transaksi)? Anda harus memasukkan master barang secara manual dari nol.')) {
-      wipeAllData();
-      alert('Seluruh data persediaan dan transaksi berhasil dikosongkan.');
-      window.location.reload();
-    }
   };
 
   const initials = userProfile.name
@@ -306,19 +311,6 @@ function PengaturanContent() {
             <span>Daftar Tim & Penanggung Jawab (PJ)</span>
           </button>
         )}
-
-        <button
-          onClick={() => setActiveTab('sistem')}
-          className={cn(
-            'pb-3 px-4 text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-all',
-            activeTab === 'sistem'
-              ? 'border-bps-blue text-bps-blue'
-              : 'border-transparent text-dark-400 hover:text-dark-700'
-          )}
-        >
-          <BarChart3 className="w-4 h-4" />
-          <span>Informasi Sistem</span>
-        </button>
 
         <button
           onClick={() => setActiveTab('instansi')}
@@ -608,157 +600,6 @@ function PengaturanContent() {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tab Content: Informasi Sistem */}
-      {activeTab === 'sistem' && (
-        <div className="space-y-6">
-          <div className="card p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-bps-blue to-bps-teal flex items-center justify-center shadow-lg shadow-bps-blue/20">
-                <BarChart3 className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-bold text-dark-800">SIMPAN OKUS</h2>
-                  <span className="badge text-[11px] font-bold bg-bps-blue-50 text-bps-blue border border-bps-blue/20">
-                    BPS OKU SELATAN
-                  </span>
-                </div>
-                <p className="text-sm text-dark-500 font-medium mt-0.5">
-                  Sistem Informasi Manajemen Persediaan Ogan Komering Ulu Selatan
-                </p>
-                <p className="text-xs text-dark-400 mt-0.5">
-                  Dirancang untuk akuntabilitas, transparansi stock opname, dan kemudahan permintaan ATK
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-4 rounded-xl bg-dark-50 border border-dark-100">
-                <div className="flex items-center gap-2 text-xs text-dark-500 mb-1.5">
-                  <Info className="w-4 h-4 text-bps-blue" />
-                  <span>Versi Aplikasi</span>
-                </div>
-                <p className="text-lg font-bold text-dark-800">v1.2.0 (Stable)</p>
-                <p className="text-[11px] text-dark-400 mt-0.5">Next.js 14 + TailwindCSS</p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-dark-50 border border-dark-100">
-                <div className="flex items-center gap-2 text-xs text-dark-500 mb-1.5">
-                  <Database className="w-4 h-4 text-emerald-600" />
-                  <span>Database Utama</span>
-                </div>
-                <p className="text-lg font-bold text-dark-800">PostgreSQL (Supabase)</p>
-                <p className="text-[11px] text-emerald-600 font-medium mt-0.5">✓ Terhubung Aktif</p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-dark-50 border border-dark-100">
-                <div className="flex items-center gap-2 text-xs text-dark-500 mb-1.5">
-                  <Globe className="w-4 h-4 text-bps-orange" />
-                  <span>Lingkungan</span>
-                </div>
-                <p className="text-lg font-bold text-dark-800">BPS OKU Selatan</p>
-                <p className="text-[11px] text-dark-400 mt-0.5">Kode Satker: 1608</p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-dark-50 border border-dark-100">
-                <div className="flex items-center gap-2 text-xs text-dark-500 mb-1.5">
-                  <Shield className="w-4 h-4 text-purple-600" />
-                  <span>Autentikasi & RLS</span>
-                </div>
-                <p className="text-lg font-bold text-dark-800">Multi-Role Aktif</p>
-                <p className="text-[11px] text-purple-600 font-medium mt-0.5">Admin & Pegawai</p>
-              </div>
-            </div>
-
-            {/* Bagian Uji Coba & Manajemen Data Persediaan */}
-            <div className="mt-6 pt-5 border-t border-dark-100">
-              <div className="flex items-center justify-between gap-4 mb-2">
-                <h4 className="text-sm font-bold text-dark-800 flex items-center gap-2">
-                  <Database className="w-4 h-4 text-bps-blue" />
-                  Manajemen &amp; Reset Data Persediaan (Uji Coba Sistem)
-                </h4>
-                <span className="badge bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                  Fitur Pengujian
-                </span>
-              </div>
-              <p className="text-xs text-dark-400 mb-4">
-                Pilih opsi di bawah untuk mengatur ulang data persediaan sesuai kebutuhan pengujian alur sistem per fitur.
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                {/* Opsi 1: Reset Bersih Siap Uji Coba (Rekomendasi Utama) */}
-                <div className="p-4 rounded-2xl border-2 border-emerald-300 bg-emerald-50/50 flex flex-col justify-between relative overflow-hidden shadow-xs hover:border-emerald-400 transition-all">
-                  <div className="absolute top-2 right-2">
-                    <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white">
-                      Rekomendasi
-                    </span>
-                  </div>
-                  <div>
-                    <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2.5">
-                      <RotateCcw className="w-4 h-4" />
-                    </div>
-                    <h5 className="text-xs font-bold text-dark-800">Mode Uji Coba Bersih</h5>
-                    <p className="text-[11px] text-dark-500 mt-1 leading-relaxed">
-                      81 Master barang siap dengan stok baseline. Transaksi masuk &amp; keluar 0. Siap untuk uji coba input transaksi masuk, permintaan (SPB), persetujuan, dan kartu kendali.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleResetTestingData}
-                    className="mt-4 w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all shadow-xs active:scale-95"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Reset untuk Uji Coba</span>
-                  </button>
-                </div>
-
-                {/* Opsi 2: Muat Data Simulasi Lengkap */}
-                <div className="p-4 rounded-2xl border border-bps-blue/20 bg-bps-blue-50/40 flex flex-col justify-between shadow-xs hover:border-bps-blue/40 transition-all">
-                  <div>
-                    <div className="w-8 h-8 rounded-xl bg-bps-blue-100 text-bps-blue flex items-center justify-center mb-2.5">
-                      <Database className="w-4 h-4" />
-                    </div>
-                    <h5 className="text-xs font-bold text-dark-800">Data Simulasi Penuh</h5>
-                    <p className="text-[11px] text-dark-500 mt-1 leading-relaxed">
-                      Memuat 81 barang BPS lengkap beserta contoh riwayat transaksi masuk dan keluar (Agustus - September) untuk demonstrasi instan.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleLoadSampleData}
-                    className="mt-4 w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-bps-blue bg-white hover:bg-bps-blue-50 border border-bps-blue/30 transition-all shadow-xs active:scale-95"
-                  >
-                    <Database className="w-3.5 h-3.5" />
-                    <span>Muat Data Simulasi</span>
-                  </button>
-                </div>
-
-                {/* Opsi 3: Kosongkan Total */}
-                <div className="p-4 rounded-2xl border border-red-200 bg-red-50/40 flex flex-col justify-between shadow-xs hover:border-red-300 transition-all">
-                  <div>
-                    <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center mb-2.5">
-                      <Trash2 className="w-4 h-4" />
-                    </div>
-                    <h5 className="text-xs font-bold text-dark-800">Kosongkan Total</h5>
-                    <p className="text-[11px] text-dark-500 mt-1 leading-relaxed">
-                      Mengosongkan semua data (0 barang, 0 transaksi masuk, 0 transaksi keluar) jika ingin mencoba input master barang dari formulir kosong.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleClearAllData}
-                    className="mt-4 w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-red-700 bg-white hover:bg-red-50 border border-red-300 transition-all shadow-xs active:scale-95"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Kosongkan Semua Data</span>
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>

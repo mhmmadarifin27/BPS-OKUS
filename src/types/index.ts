@@ -96,7 +96,7 @@ export const TIM_PEMOHON_LIST: TimPemohon[] = [
 // Transaksi Masuk (Updated)
 // ==========================================
 
-export type SumberBarangMasuk = 'Pembelian' | 'Transfer Masuk';
+export type SumberBarangMasuk = 'Pembelian' | 'Dari Provinsi' | 'Transfer Masuk';
 
 export interface TransaksiMasukItem {
   id_barang: number;
@@ -144,6 +144,7 @@ export interface TransaksiKeluar {
   penanggung_jawab: string;  // Nama PJ
   nip_pj: string;            // NIP PJ
   jenis_pengeluaran?: JenisPengeluaran;
+  status?: 'pending' | 'approved' | 'rejected';
   items: TransaksiKeluarItem[];
   keterangan: string | null;
   created_by: string;

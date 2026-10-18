@@ -74,7 +74,7 @@ export async function fetchAndSyncBarang(): Promise<Barang[] | null> {
     const res = await fetch('/api/barang', { cache: 'no-store' });
     if (!res.ok) return null;
     const json = await res.json();
-    if (Array.isArray(json.data)) {
+    if (Array.isArray(json.data) && json.data.length > 0) {
       const parsed = parseRemoteBarang(json.data);
       if (typeof window !== 'undefined') {
         localStorage.setItem('sipersedia_barang_list', JSON.stringify(parsed));
@@ -254,6 +254,23 @@ export async function clearAllTransaksiKeluarRemote(): Promise<boolean> {
 // ==========================================================
 
 export function parseRemoteTransaksiMasuk(rows: any[], barangList: Barang[]): TransaksiMasuk[] {
+  // Selalu lengkapi barangList dengan cache lokal terbaru jika ada
+  let activeBarang = [...barangList];
+  if (typeof window !== 'undefined') {
+    try {
+      const localBarangStr = localStorage.getItem('sipersedia_barang_list');
+      if (localBarangStr) {
+        const parsedB = JSON.parse(localBarangStr);
+        if (Array.isArray(parsedB)) {
+          const map = new Map<number, Barang>();
+          activeBarang.forEach(b => map.set(b.id, b));
+          parsedB.forEach(b => map.set(b.id, b));
+          activeBarang = Array.from(map.values());
+        }
+      }
+    } catch {}
+  }
+
   return rows.map((r) => {
     let meta: any = {};
     if (r.keterangan && typeof r.keterangan === 'string' && r.keterangan.startsWith('{')) {
@@ -262,11 +279,11 @@ export function parseRemoteTransaksiMasuk(rows: any[], barangList: Barang[]): Tr
       } catch (e) {}
     }
 
-    const b = barangList.find((b) => b.id === r.id_barang);
+    const b = activeBarang.find((b) => b.id === r.id_barang);
     const items = meta.items && meta.items.length > 0
       ? meta.items.map((it: any) => ({
           ...it,
-          barang: barangList.find((b) => b.id === it.id_barang) || b,
+          barang: activeBarang.find((b) => b.id === it.id_barang) || it.barang || b,
         }))
       : [
           {
@@ -303,8 +320,25 @@ export async function fetchAndSyncTransaksiMasuk(barangList: Barang[]): Promise<
       const localList: TransaksiMasuk[] = localStr ? JSON.parse(localStr) : [];
 
       const mergedMap = new Map<string, TransaksiMasuk>();
-      localList.forEach((t) => mergedMap.set(t.no_dokumen, t));
-      parsed.forEach((t) => mergedMap.set(t.no_dokumen, t));
+      // 1. Simpan semua riwayat lokal
+      localList.forEach((t) => {
+        if (t && t.no_dokumen) mergedMap.set(t.no_dokumen, t);
+      });
+      // 2. Gabungkan dengan data remote tanpa menghapus metadata item lokal
+      parsed.forEach((t) => {
+        if (!t || !t.no_dokumen) return;
+        const existing = mergedMap.get(t.no_dokumen);
+        if (existing) {
+          // Bila di lokal sudah ada item detail yang lengkap, pertahankan
+          mergedMap.set(t.no_dokumen, {
+            ...existing,
+            ...t,
+            items: (t.items && t.items.length > 0 && t.items[0]?.barang) ? t.items : existing.items,
+          });
+        } else {
+          mergedMap.set(t.no_dokumen, t);
+        }
+      });
 
       const merged = Array.from(mergedMap.values()).sort(
         (a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()

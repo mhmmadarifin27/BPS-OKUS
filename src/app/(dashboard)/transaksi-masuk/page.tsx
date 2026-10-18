@@ -15,12 +15,17 @@ import {
   deleteTransaksiMasukRemote,
   fetchAndSyncBarang,
   updateBarangStockRemote,
+  pushBarang,
 } from '@/lib/sync-service';
 
 interface FormMasukItem {
-  id_barang: number;
+  id_barang: number | null;
+  nama_barang: string;
   jumlah: number;
   keterangan: string;
+  is_new?: boolean;
+  satuan?: string;
+  kategori?: string;
 }
 
 export default function TransaksiMasukPage() {
@@ -48,16 +53,32 @@ export default function TransaksiMasukPage() {
   const [showQuickAddBarang, setShowQuickAddBarang] = useState(false);
   const [quickAddIdx, setQuickAddIdx] = useState<number>(0);
   const [quickNamaBarang, setQuickNamaBarang] = useState('');
+  const [quickKodeBarang, setQuickKodeBarang] = useState('');
   const [quickSatuan, setQuickSatuan] = useState('Buah');
   const [quickKategori, setQuickKategori] = useState('Alat Tulis Kantor');
+  const [quickLokasi, setQuickLokasi] = useState('Gudang ATK');
+  const [quickDeskripsi, setQuickDeskripsi] = useState('');
+
+  // Dropdown master options
+  const [kategoriOptions, setKategoriOptions] = useState<string[]>([
+    'Alat Tulis Kantor', 'Peralatan Komputer', 'Perlengkapan Rumah Tangga',
+    'Alat Kebersihan', 'Perlengkapan Cetakan', 'Peralatan Elektronik'
+  ]);
+  const [satuanOptions, setSatuanOptions] = useState<string[]>([
+    'Buah', 'Rim', 'Lusin', 'Pak', 'Dus', 'Set', 'Unit', 'Lembar', 'Roll', 'Botol', 'Kotak', 'Batang'
+  ]);
+  const [lokasiOptions, setLokasiOptions] = useState<string[]>([
+    'Gudang Utama', 'Gudang ATK', 'Rak Server', 'Ruang Arsip'
+  ]);
 
   // Form State
   const [formSumber, setFormSumber] = useState<SumberBarangMasuk>('Pembelian');
   const [formTanggal, setFormTanggal] = useState<string>(new Date().toISOString().split('T')[0]);
   const [formNoReferensi, setFormNoReferensi] = useState<string>('');
   const [formItems, setFormItems] = useState<FormMasukItem[]>([
-    { id_barang: mockBarang[0]?.id || 1, jumlah: 10, keterangan: '' }
+    { id_barang: null, nama_barang: '', jumlah: 1, keterangan: '', is_new: false, satuan: 'Buah', kategori: 'Alat Tulis Kantor' }
   ]);
+  const [activeSearchIdx, setActiveSearchIdx] = useState<number | null>(null);
   const [formKeterangan, setFormKeterangan] = useState<string>('');
   const [tglCetakDokumen, setTglCetakDokumen] = useState<string>(new Date().toISOString().split('T')[0]);
 
@@ -75,6 +96,35 @@ export default function TransaksiMasukPage() {
       }
     } else {
       localStorage.setItem('sipersedia_transaksi_masuk', JSON.stringify(mockTransaksiMasuk));
+    }
+
+    // Load master kategori, satuan, lokasi
+    const katSaved = localStorage.getItem('sipersedia_kategori_list');
+    if (katSaved) {
+      try {
+        const parsed = JSON.parse(katSaved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setKategoriOptions(parsed.map((k: any) => k.nama || k.nama_kategori).filter(Boolean));
+        }
+      } catch {}
+    }
+    const satSaved = localStorage.getItem('sipersedia_satuan_list');
+    if (satSaved) {
+      try {
+        const parsed = JSON.parse(satSaved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSatuanOptions(parsed.map((s: any) => s.nama || s.nama_satuan).filter(Boolean));
+        }
+      } catch {}
+    }
+    const lokSaved = localStorage.getItem('sipersedia_lokasi_list');
+    if (lokSaved) {
+      try {
+        const parsed = JSON.parse(lokSaved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setLokasiOptions(parsed.map((l: any) => l.nama || l.nama_lokasi).filter(Boolean));
+        }
+      } catch {}
     }
 
     let currentBarang = barangList;
@@ -107,8 +157,28 @@ export default function TransaksiMasukPage() {
 
     // Polling sync transaksi masuk setiap 6 detik
     const syncInterval = setInterval(() => {
-      fetchAndSyncTransaksiMasuk(currentBarang).then((synced) => {
-        if (synced) setTransaksiList(synced);
+      let latestBarang = currentBarang;
+      if (typeof window !== 'undefined') {
+        try {
+          const localB = localStorage.getItem('sipersedia_barang_list');
+          if (localB) {
+            const parsed = JSON.parse(localB);
+            if (Array.isArray(parsed) && parsed.length > 0) latestBarang = parsed;
+          }
+        } catch {}
+      }
+      fetchAndSyncTransaksiMasuk(latestBarang).then((synced) => {
+        if (synced && synced.length > 0) {
+          setTransaksiList(prev => {
+            if (synced.length >= prev.length) return synced;
+            const map = new Map<string, TransaksiMasuk>();
+            prev.forEach(t => map.set(t.no_dokumen, t));
+            synced.forEach(t => map.set(t.no_dokumen, t));
+            return Array.from(map.values()).sort(
+              (a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()
+            );
+          });
+        }
       });
     }, 6000);
 
@@ -118,6 +188,57 @@ export default function TransaksiMasukPage() {
   const showToast = (message: string, type: 'success' | 'info' = 'success') => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
+  };
+
+  const generateNextDocNo = (tanggal: string, list: TransaksiMasuk[]): string => {
+    const d = new Date(tanggal || new Date());
+    const year = isNaN(d.getFullYear()) ? new Date().getFullYear() : d.getFullYear();
+    const month = String(isNaN(d.getMonth()) ? (new Date().getMonth() + 1) : (d.getMonth() + 1)).padStart(2, '0');
+    const prefix = `BM-${year}/${month}/`;
+
+    const existingDocs = new Set<string>();
+    list.forEach(t => { if (t?.no_dokumen) existingDocs.add(t.no_dokumen); });
+
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('sipersedia_transaksi_masuk');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((t: any) => { if (t?.no_dokumen) existingDocs.add(t.no_dokumen); });
+          }
+        }
+      } catch {}
+    }
+
+    let maxSeq = 0;
+    existingDocs.forEach(doc => {
+      if (doc && doc.startsWith(prefix)) {
+        const part = doc.slice(prefix.length).split(/[^0-9]/)[0];
+        const num = parseInt(part, 10);
+        if (!isNaN(num) && num > maxSeq) {
+          maxSeq = num;
+        }
+      }
+    });
+
+    const nextSeq = maxSeq + 1;
+    const candidate = `${prefix}${String(nextSeq).padStart(3, '0')}`;
+    if (existingDocs.has(candidate)) {
+      return `${prefix}${String(nextSeq + 1).padStart(3, '0')}`;
+    }
+    return candidate;
+  };
+
+  const generateNextNoRef = (sumber: SumberBarangMasuk, tanggal: string, list: TransaksiMasuk[]): string => {
+    const d = new Date(tanggal || new Date());
+    const year = isNaN(d.getFullYear()) ? new Date().getFullYear() : d.getFullYear();
+    const month = String(isNaN(d.getMonth()) ? (new Date().getMonth() + 1) : (d.getMonth() + 1)).padStart(2, '0');
+    const count = list.length + 1;
+    if (sumber === 'Pembelian') {
+      return `NOTA/${year}/${month}/${String(count).padStart(3, '0')}`;
+    }
+    return `BAST/BPS-SUMSEL/${year}/${month}/${String(count).padStart(3, '0')}`;
   };
 
   const filtered = transaksiList.filter(t =>
@@ -133,23 +254,21 @@ export default function TransaksiMasukPage() {
   const handleOpenAdd = () => {
     setEditItem(null);
     setFormSumber('Pembelian');
-    setFormTanggal(new Date().toISOString().split('T')[0]);
-    setFormNoReferensi(`NOTA/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${String(transaksiList.length + 1).padStart(3, '0')}`);
+    const today = new Date().toISOString().split('T')[0];
+    setFormTanggal(today);
+    setFormNoReferensi(generateNextNoRef('Pembelian', today, transaksiList));
     setFormItems([
-      { id_barang: barangList[0]?.id || 1, jumlah: 10, keterangan: '' }
+      { id_barang: null, nama_barang: '', jumlah: 1, keterangan: '', is_new: false, satuan: 'Buah', kategori: 'Alat Tulis Kantor' }
     ]);
     setFormKeterangan('');
+    setActiveSearchIdx(null);
     setShowModal(true);
   };
 
   const handleSumberChange = (sumber: SumberBarangMasuk) => {
     setFormSumber(sumber);
     if (!editItem) {
-      if (sumber === 'Pembelian') {
-        setFormNoReferensi(`NOTA/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${String(transaksiList.length + 1).padStart(3, '0')}`);
-      } else {
-        setFormNoReferensi(`BAST/BPS-SUMSEL/${String(transaksiList.length + 1).padStart(3, '0')}/${new Date().getFullYear()}`);
-      }
+      setFormNoReferensi(generateNextNoRef(sumber, formTanggal, transaksiList));
     }
   };
 
@@ -159,15 +278,23 @@ export default function TransaksiMasukPage() {
     setFormTanggal(trx.tanggal);
     setFormNoReferensi(trx.no_referensi || '');
     setFormKeterangan(trx.keterangan || '');
+    setActiveSearchIdx(null);
     if (trx.items && trx.items.length > 0) {
-      setFormItems(trx.items.map(item => ({
-        id_barang: item.id_barang,
-        jumlah: item.jumlah,
-        keterangan: item.keterangan || '',
-      })));
+      setFormItems(trx.items.map(item => {
+        const found = item.barang || barangList.find(b => b.id === item.id_barang);
+        return {
+          id_barang: item.id_barang,
+          nama_barang: found?.nama_barang || `Barang #${item.id_barang}`,
+          jumlah: item.jumlah,
+          keterangan: item.keterangan || '',
+          is_new: false,
+          satuan: found?.satuan?.nama_satuan || 'Buah',
+          kategori: found?.kategori?.nama_kategori || 'Alat Tulis Kantor',
+        };
+      }));
     } else {
       setFormItems([
-        { id_barang: barangList[0]?.id || 1, jumlah: 1, keterangan: '' }
+        { id_barang: null, nama_barang: '', jumlah: 1, keterangan: '', is_new: false, satuan: 'Buah', kategori: 'Alat Tulis Kantor' }
       ]);
     }
     setShowModal(true);
@@ -176,7 +303,7 @@ export default function TransaksiMasukPage() {
   const addFormItem = () => {
     setFormItems(prev => [
       ...prev,
-      { id_barang: barangList[0]?.id || 1, jumlah: 1, keterangan: '' }
+      { id_barang: null, nama_barang: '', jumlah: 1, keterangan: '', is_new: false, satuan: 'Buah', kategori: 'Alat Tulis Kantor' }
     ]);
   };
 
@@ -200,30 +327,36 @@ export default function TransaksiMasukPage() {
       alert('Nama barang tidak boleh kosong!');
       return;
     }
+    const maxId = barangList.reduce((max, b) => Math.max(max, Number(b.id) || 0), 0);
+    const nextId = (maxId || 81) + 1;
+    const nextKode = quickKodeBarang.trim() || `000${String(nextId).padStart(3, '0')}`;
     const newB: Barang = {
-      id: Date.now(),
-      kode_barang: '-',
+      id: nextId,
+      kode_barang: nextKode,
       nama_barang: quickNamaBarang.trim(),
-      id_kategori: 1,
-      id_satuan: 1,
-      id_lokasi: 1,
+      id_kategori: kategoriOptions.findIndex(k => k === quickKategori) + 1 || 1,
+      id_satuan: satuanOptions.findIndex(s => s === quickSatuan) + 1 || 1,
+      id_lokasi: lokasiOptions.findIndex(l => l === quickLokasi) + 1 || 1,
       stok: 0,
       stok_minimum: 0,
       foto_url: null,
-      deskripsi: 'Ditambahkan via Transaksi Masuk',
+      deskripsi: quickDeskripsi.trim() || 'Ditambahkan via Transaksi Masuk',
       created_at: new Date().toISOString().split('T')[0],
       updated_at: new Date().toISOString().split('T')[0],
       kategori: { id: 1, nama_kategori: quickKategori, deskripsi: null, created_at: '' },
       satuan: { id: 1, nama_satuan: quickSatuan, created_at: '' },
-      lokasi: { id: 1, nama_lokasi: 'Gudang ATK', deskripsi: null, created_at: '' },
+      lokasi: { id: 1, nama_lokasi: quickLokasi, deskripsi: null, created_at: '' },
     };
     const updatedBarang = [newB, ...barangList];
     setBarangList(updatedBarang);
     localStorage.setItem('sipersedia_barang_list', JSON.stringify(updatedBarang));
+    pushBarang(newB);
     updateFormItem(quickAddIdx, 'id_barang', newB.id);
     setShowQuickAddBarang(false);
     setQuickNamaBarang('');
-    showToast(`Barang baru "${newB.nama_barang}" berhasil ditambahkan & langsung dipilih!`, 'success');
+    setQuickKodeBarang('');
+    setQuickDeskripsi('');
+    showToast(`Barang baru "${newB.nama_barang}" berhasil didaftarkan ke Master Barang & langsung dipilih!`, 'success');
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -232,24 +365,67 @@ export default function TransaksiMasukPage() {
       alert('Tambahkan minimal 1 item barang');
       return;
     }
-    if (formItems.some(i => i.jumlah <= 0)) {
-      alert('Jumlah semua barang masuk harus lebih dari 0');
-      return;
+
+    // Validasi nama barang dan jumlah
+    for (let i = 0; i < formItems.length; i++) {
+      if (!formItems[i].nama_barang || !formItems[i].nama_barang.trim()) {
+        alert(`Nama barang pada Baris #${i + 1} tidak boleh kosong! Silakan ketik nama barang.`);
+        return;
+      }
+      if (formItems[i].jumlah <= 0) {
+        alert(`Jumlah barang masuk pada Baris #${i + 1} harus lebih dari 0`);
+        return;
+      }
     }
 
+    let nextBarang = [...barangList];
+    const newBarangToPush: Barang[] = [];
+
+    // 1. Resolve setiap item (master barang yang ada atau buat baru dengan stok awal 0)
     const preparedItems = formItems.map(item => {
-      const b = barangList.find(b => b.id === Number(item.id_barang));
+      const trimmedName = item.nama_barang.trim();
+      let matchedB = item.id_barang
+        ? nextBarang.find(b => b.id === item.id_barang)
+        : nextBarang.find(b => b.nama_barang.toLowerCase() === trimmedName.toLowerCase());
+
+      if (!matchedB) {
+        const maxId = nextBarang.reduce((max, b) => Math.max(max, Number(b.id) || 0), 0);
+        const nextId = (maxId || 81) + 1;
+        const nextKode = `000${String(nextId).padStart(3, '0')}`;
+        const katName = item.kategori || 'Alat Tulis Kantor';
+        const satName = item.satuan || 'Buah';
+
+        matchedB = {
+          id: nextId,
+          kode_barang: nextKode,
+          nama_barang: trimmedName,
+          id_kategori: kategoriOptions.findIndex(k => k === katName) + 1 || 1,
+          id_satuan: satuanOptions.findIndex(s => s === satName) + 1 || 1,
+          id_lokasi: 1,
+          stok: 0, // ponytail: Stok awal barang baru selalu 0, penambahan murni dari barang masuk
+          stok_minimum: 0,
+          foto_url: null,
+          deskripsi: 'Ditambahkan via Transaksi Masuk',
+          created_at: new Date().toISOString().split('T')[0],
+          updated_at: new Date().toISOString().split('T')[0],
+          kategori: { id: 1, nama_kategori: katName, deskripsi: null, created_at: '' },
+          satuan: { id: 1, nama_satuan: satName, created_at: '' },
+          lokasi: { id: 1, nama_lokasi: 'Gudang ATK', deskripsi: null, created_at: '' },
+        };
+        nextBarang = [matchedB, ...nextBarang];
+        newBarangToPush.push(matchedB);
+      }
+
       return {
-        id_barang: Number(item.id_barang),
+        id_barang: matchedB.id,
         jumlah: Number(item.jumlah),
         harga_satuan: null,
         keterangan: item.keterangan.trim() || null,
-        barang: b,
+        barang: matchedB,
       };
     });
 
     let updatedList: TransaksiMasuk[];
-    let nextBarang = [...barangList];
 
     if (editItem) {
       // 1. Revert stok lama
@@ -299,9 +475,9 @@ export default function TransaksiMasukPage() {
         });
       });
 
-      const docNo = `BM-${new Date(formTanggal).getFullYear()}/${String(new Date(formTanggal).getMonth() + 1).padStart(2, '0')}/${String(transaksiList.length + 1).padStart(3, '0')}`;
+      const docNo = generateNextDocNo(formTanggal, transaksiList);
       const newTrx: TransaksiMasuk = {
-        id: Date.now(),
+        id: Date.now() + Math.floor(Math.random() * 1000),
         no_dokumen: docNo,
         tanggal: formTanggal,
         sumber: formSumber,
@@ -316,6 +492,11 @@ export default function TransaksiMasukPage() {
       pushTransaksiMasuk(newTrx);
       showToast(`Dokumen transaksi masuk ${newTrx.no_dokumen} (${preparedItems.length} item) berhasil dicatat!`, 'success');
     }
+
+    // Daftarkan master barang baru jika ada
+    newBarangToPush.forEach(nb => {
+      pushBarang(nb);
+    });
 
     // Update stok di Cloud Database
     nextBarang.forEach(b => {
@@ -334,6 +515,7 @@ export default function TransaksiMasukPage() {
       });
     }
 
+    setActiveSearchIdx(null);
     setShowModal(false);
   };
 
@@ -576,7 +758,7 @@ export default function TransaksiMasukPage() {
                       required
                     >
                       <option value="Pembelian">Pembelian (Pengadaan Kantor)</option>
-                      <option value="Transfer Masuk">Transfer Masuk dari BPS Provinsi</option>
+                      <option value="Dari Provinsi">Dari Provinsi (BPS Provinsi)</option>
                     </select>
                   </div>
                   <div>
@@ -624,76 +806,216 @@ export default function TransaksiMasukPage() {
                     </button>
                   </div>
 
-                  <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                    {formItems.map((item, idx) => (
-                      <div key={idx} className="p-3 bg-dark-50 rounded-xl border border-dark-100 space-y-2 relative">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-dark-700">Barang #{idx + 1}</span>
-                          {formItems.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeFormItem(idx)}
-                              className="text-red-500 hover:text-red-700 text-xs inline-flex items-center gap-1"
-                            >
-                              <Trash className="w-3 h-3" />
-                              <span>Hapus</span>
-                            </button>
+                  <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                    {formItems.map((item, idx) => {
+                      const selectedB = item.id_barang ? barangList.find(b => b.id === item.id_barang) : null;
+                      const currentStock = selectedB ? selectedB.stok : 0;
+                      const currentSatuan = selectedB?.satuan?.nama_satuan || item.satuan || 'Buah';
+                      const isNewItem = item.is_new || (!selectedB && (item.nama_barang || '').trim().length > 0);
+
+                      const matchingBarang = barangList
+                        .filter(b => b.nama_barang.toLowerCase().includes((item.nama_barang || '').toLowerCase().trim()))
+                        .slice(0, 8);
+
+                      return (
+                        <div key={idx} className="p-3.5 bg-dark-50 rounded-xl border border-dark-100 space-y-2.5 relative">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-dark-800">Barang #{idx + 1}</span>
+                            {formItems.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeFormItem(idx)}
+                                className="text-red-500 hover:text-red-700 text-xs inline-flex items-center gap-1 font-medium"
+                              >
+                                <Trash className="w-3.5 h-3.5" />
+                                <span>Hapus</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* INPUT AUTOCOMPLETE CARI / TAMBAH BARANG */}
+                          <div className="relative">
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="input-label text-[11px] font-semibold text-dark-700 mb-0">
+                                Nama Barang <span className="text-red-500">*</span>
+                              </label>
+                              {selectedB && (
+                                <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  Tersedia (Sisa Stok: {selectedB.stok} {currentSatuan})
+                                </span>
+                              )}
+                              {isNewItem && !selectedB && (
+                                <span className="text-[10px] bg-bps-blue-50 text-bps-blue-700 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-bps-blue-200">
+                                  ✨ Barang Baru (Stok Awal: 0)
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="relative">
+                              <input
+                                type="text"
+                                className="input text-xs pl-8 pr-8 font-medium"
+                                placeholder="Ketik nama barang (contoh: Lakban, Necis, Kertas HVS...)"
+                                value={item.nama_barang}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  updateFormItem(idx, 'nama_barang', val);
+                                  const matched = barangList.find(b => b.nama_barang.toLowerCase() === val.toLowerCase().trim());
+                                  if (matched) {
+                                    updateFormItem(idx, 'id_barang', matched.id);
+                                    updateFormItem(idx, 'is_new', false);
+                                    updateFormItem(idx, 'satuan', matched.satuan?.nama_satuan || 'Buah');
+                                  } else {
+                                    updateFormItem(idx, 'id_barang', null);
+                                  }
+                                  setActiveSearchIdx(idx);
+                                }}
+                                onFocus={() => setActiveSearchIdx(idx)}
+                                required
+                              />
+                              <Search className="w-3.5 h-3.5 text-dark-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                              {item.nama_barang && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    updateFormItem(idx, 'nama_barang', '');
+                                    updateFormItem(idx, 'id_barang', null);
+                                    updateFormItem(idx, 'is_new', false);
+                                    setActiveSearchIdx(idx);
+                                  }}
+                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 hover:text-dark-600 p-0.5"
+                                  title="Bersihkan / Cari Lain"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Dropdown Autocomplete Live Popup */}
+                            {activeSearchIdx === idx && (
+                              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-dark-200 rounded-xl shadow-2xl z-40 max-h-52 overflow-y-auto">
+                                {matchingBarang.length > 0 && (
+                                  <div className="p-1.5 border-b border-dark-100 bg-dark-50/70 text-[10px] font-bold text-dark-500 uppercase tracking-wider">
+                                    Pilih dari Data Master Barang:
+                                  </div>
+                                )}
+                                {matchingBarang.map(b => (
+                                  <button
+                                    key={b.id}
+                                    type="button"
+                                    onClick={() => {
+                                      updateFormItem(idx, 'id_barang', b.id);
+                                      updateFormItem(idx, 'nama_barang', b.nama_barang);
+                                      updateFormItem(idx, 'is_new', false);
+                                      updateFormItem(idx, 'satuan', b.satuan?.nama_satuan || 'Buah');
+                                      updateFormItem(idx, 'kategori', b.kategori?.nama_kategori || 'Alat Tulis Kantor');
+                                      setActiveSearchIdx(null);
+                                    }}
+                                    className="w-full text-left px-3 py-2 hover:bg-bps-blue-50 transition-colors flex items-center justify-between border-b border-dark-50 last:border-0"
+                                  >
+                                    <div>
+                                      <div className="text-xs font-bold text-dark-800">{b.nama_barang}</div>
+                                      <div className="text-[10px] text-dark-400">
+                                        Kode: {b.kode_barang} &bull; {b.kategori?.nama_kategori || 'Umum'}
+                                      </div>
+                                    </div>
+                                    <span className="text-[11px] font-bold text-bps-blue bg-bps-blue-50 px-2.5 py-1 rounded-lg border border-bps-blue-100 whitespace-nowrap">
+                                      Sisa Stok: {b.stok} {b.satuan?.nama_satuan || 'Buah'}
+                                    </span>
+                                  </button>
+                                ))}
+
+                                {/* Pilihan Daftarkan Barang Baru */}
+                                {item.nama_barang.trim().length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      updateFormItem(idx, 'id_barang', null);
+                                      updateFormItem(idx, 'is_new', true);
+                                      setActiveSearchIdx(null);
+                                    }}
+                                    className="w-full text-left px-3 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors flex items-center gap-2 border-t border-emerald-100"
+                                  >
+                                    <PlusCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                                    <div>
+                                      <div className="text-xs font-bold text-emerald-900">
+                                        + Jadikan Barang Baru: &ldquo;{item.nama_barang}&rdquo;
+                                      </div>
+                                      <div className="text-[10px] text-emerald-700">
+                                        Otomatis terdaftar di Master Barang dengan stok awal 0
+                                      </div>
+                                    </div>
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Jika Barang Baru, Tampilkan Opsi Satuan & Kategori Inline yang Ringkas */}
+                          {isNewItem && !selectedB && (
+                            <div className="p-2.5 bg-bps-blue-50/50 border border-bps-blue-100 rounded-lg space-y-2">
+                              <div className="flex items-center justify-between text-[11px] font-bold text-bps-blue-800">
+                                <span>Informasi Tambahan Barang Baru</span>
+                                <span className="text-[10px] text-bps-blue-600">Stok Awal: 0 (Murni dari barang masuk)</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-[10px] font-semibold text-dark-600 block mb-0.5">Satuan</label>
+                                  <select
+                                    className="input text-xs py-1 h-8"
+                                    value={item.satuan || 'Buah'}
+                                    onChange={(e) => updateFormItem(idx, 'satuan', e.target.value)}
+                                  >
+                                    {satuanOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-semibold text-dark-600 block mb-0.5">Kategori</label>
+                                  <select
+                                    className="input text-xs py-1 h-8"
+                                    value={item.kategori || 'Alat Tulis Kantor'}
+                                    onChange={(e) => updateFormItem(idx, 'kategori', e.target.value)}
+                                  >
+                                    {kategoriOptions.map(k => <option key={k} value={k}>{k}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
                           )}
-                        </div>
 
-                        <div className="flex items-center justify-between">
-                          <label className="input-label text-[11px] font-semibold text-dark-600 mb-0">Pilih Barang</label>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setQuickAddIdx(idx);
-                              setQuickNamaBarang('');
-                              setShowQuickAddBarang(true);
-                            }}
-                            className="text-[11px] font-bold text-bps-blue hover:text-bps-blue-700 underline inline-flex items-center gap-1"
-                          >
-                            <Plus className="w-3 h-3" />
-                            <span>+ Tambah Barang Baru</span>
-                          </button>
-                        </div>
-                        <select
-                          className="input text-xs"
-                          value={item.id_barang}
-                          onChange={(e) => updateFormItem(idx, 'id_barang', Number(e.target.value))}
-                          required
-                        >
-                          {barangList.map(b => (
-                            <option key={b.id} value={b.id}>
-                              {b.nama_barang} (Stok: {b.stok} {b.satuan?.nama_satuan || 'Buah'})
-                            </option>
-                          ))}
-                        </select>
+                          {/* JUMLAH BARANG MASUK DENGAN ESTIMASI STOK LANGSUNG */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="input-label text-[11px] font-semibold text-dark-700 mb-0">
+                                Jumlah Masuk ({currentSatuan}) <span className="text-red-500">*</span>
+                              </label>
+                              <span className="text-[11px] text-dark-500">
+                                Sisa Stok: <strong className="text-dark-800">{currentStock}</strong> + Masuk: <strong className="text-bps-blue font-bold">{Number(item.jumlah) || 0}</strong> = Estimasi: <strong className="text-emerald-600 font-bold">{currentStock + (Number(item.jumlah) || 0)} {currentSatuan}</strong>
+                              </span>
+                            </div>
+                            <input
+                              type="number"
+                              min="1"
+                              className="input text-xs font-bold w-full"
+                              value={item.jumlah}
+                              onChange={(e) => updateFormItem(idx, 'jumlah', Number(e.target.value))}
+                              required
+                            />
+                          </div>
 
-                        <div>
-                          <label className="input-label text-[11px] font-semibold text-dark-600">
-                            Jumlah Masuk ({barangList.find(b => b.id === Number(item.id_barang))?.satuan?.nama_satuan || 'Buah'}) <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            className="input text-xs font-bold w-full"
-                            value={item.jumlah}
-                            onChange={(e) => updateFormItem(idx, 'jumlah', Number(e.target.value))}
-                            required
-                          />
+                          <div>
+                            <input
+                              type="text"
+                              className="input text-xs"
+                              placeholder="Keterangan per item (opsional)"
+                              value={item.keterangan}
+                              onChange={(e) => updateFormItem(idx, 'keterangan', e.target.value)}
+                            />
+                          </div>
                         </div>
-
-                        <div>
-                          <input
-                            type="text"
-                            className="input text-xs"
-                            placeholder="Keterangan item (opsional)"
-                            value={item.keterangan}
-                            onChange={(e) => updateFormItem(idx, 'keterangan', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -762,9 +1084,20 @@ export default function TransaksiMasukPage() {
 
       {/* Print Preview Modal — per No Surat (Master-Detail) */}
       {showPrintPreview && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slide-in-up">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-dark-100 no-print gap-3 sticky top-0 bg-white z-10">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto animate-slide-in-up relative">
+            {/* Tombol X Close Floating di Pojok Kanan Atas yang Jelas & Mudah Diklik */}
+            <button
+              type="button"
+              onClick={() => setShowPrintPreview(null)}
+              className="absolute top-3 right-3 z-30 p-2 bg-dark-100/90 hover:bg-red-50 hover:text-red-600 text-dark-500 rounded-full transition-colors shadow-sm no-print cursor-pointer"
+              title="Tutup Preview (Esc)"
+              aria-label="Tutup Preview"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-dark-100 no-print gap-3 sticky top-0 bg-white z-20 pr-14">
               <div>
                 <h2 className="text-base font-bold text-dark-800">Preview Cetak — Bukti Penerimaan Barang</h2>
                 <p className="text-xs text-dark-400">Dokumen Penerimaan Barang Masuk (Per Nomor Surat)</p>
@@ -780,12 +1113,13 @@ export default function TransaksiMasukPage() {
                     className="bg-transparent font-semibold text-dark-800 focus:outline-none cursor-pointer"
                   />
                 </div>
-                <button onClick={handlePrint} className="btn-primary text-xs py-2 px-3">
+                <button onClick={handlePrint} className="btn-primary text-xs py-2 px-3 inline-flex items-center gap-1.5 shadow-sm">
                   <Printer className="w-4 h-4" />
-                  Cetak Dokumen
+                  <span>Cetak Dokumen</span>
                 </button>
-                <button onClick={() => setShowPrintPreview(null)} className="btn-secondary text-xs py-2 px-3">
-                  Tutup
+                <button onClick={() => setShowPrintPreview(null)} className="btn-secondary text-xs py-2 px-3 inline-flex items-center gap-1 border-dark-300">
+                  <X className="w-3.5 h-3.5" />
+                  <span>Tutup</span>
                 </button>
               </div>
             </div>
@@ -963,62 +1297,88 @@ export default function TransaksiMasukPage() {
             </div>
 
             <form onSubmit={handleSaveQuickBarang} className="p-4 space-y-3">
-              <div>
-                <label className="input-label text-xs font-semibold text-dark-700">
-                  Nama Barang <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  value={quickNamaBarang}
-                  onChange={(e) => setQuickNamaBarang(e.target.value)}
-                  className="input text-xs"
-                  placeholder="Contoh: Kertas HVS F4 70gsm, Spidol Snowman..."
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="input-label text-xs font-semibold text-dark-700">Satuan Ukuran</label>
-                  <select
-                    value={quickSatuan}
-                    onChange={(e) => setQuickSatuan(e.target.value)}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="sm:col-span-2">
+                  <label className="input-label text-xs font-semibold text-dark-700">
+                    Nama Barang <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={quickNamaBarang}
+                    onChange={(e) => setQuickNamaBarang(e.target.value)}
                     className="input text-xs"
-                  >
-                    <option value="Buah">Buah</option>
-                    <option value="Rim">Rim</option>
-                    <option value="Kotak">Kotak</option>
-                    <option value="Pak">Pak</option>
-                    <option value="Dus">Dus</option>
-                    <option value="Lusin">Lusin</option>
-                    <option value="Unit">Unit</option>
-                    <option value="Lembar">Lembar</option>
-                    <option value="Roll">Roll</option>
-                    <option value="Botol">Botol</option>
-                    <option value="Batang">Batang</option>
-                    <option value="Pcs">Pcs</option>
-                  </select>
+                    placeholder="Contoh: Kertas HVS F4 70gsm, Spidol Snowman..."
+                  />
                 </div>
                 <div>
-                  <label className="input-label text-xs font-semibold text-dark-700">Kategori</label>
+                  <label className="input-label text-xs font-semibold text-dark-700">Kode Barang</label>
+                  <input
+                    type="text"
+                    value={quickKodeBarang}
+                    onChange={(e) => setQuickKodeBarang(e.target.value)}
+                    className="input text-xs font-mono"
+                    placeholder="Otomatis / custom"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="input-label text-xs font-semibold text-dark-700">Kategori <span className="text-red-500">*</span></label>
                   <select
                     value={quickKategori}
                     onChange={(e) => setQuickKategori(e.target.value)}
                     className="input text-xs"
+                    required
                   >
-                    <option value="Alat Tulis Kantor">Alat Tulis Kantor</option>
-                    <option value="Peralatan Komputer">Peralatan Komputer</option>
-                    <option value="Perlengkapan Cetakan">Perlengkapan Cetakan</option>
-                    <option value="Alat Kebersihan">Alat Kebersihan</option>
-                    <option value="Perlengkapan Rumah Tangga">Perlengkapan Rumah Tangga</option>
-                    <option value="Peralatan Elektronik">Peralatan Elektronik</option>
+                    {kategoriOptions.map((k) => (
+                      <option key={k} value={k}>{k}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="input-label text-xs font-semibold text-dark-700">Satuan <span className="text-red-500">*</span></label>
+                  <select
+                    value={quickSatuan}
+                    onChange={(e) => setQuickSatuan(e.target.value)}
+                    className="input text-xs"
+                    required
+                  >
+                    {satuanOptions.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="input-label text-xs font-semibold text-dark-700">Lokasi <span className="text-red-500">*</span></label>
+                  <select
+                    value={quickLokasi}
+                    onChange={(e) => setQuickLokasi(e.target.value)}
+                    className="input text-xs"
+                    required
+                  >
+                    {lokasiOptions.map((l) => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
                   </select>
                 </div>
               </div>
 
+              <div>
+                <label className="input-label text-xs font-semibold text-dark-700">Deskripsi / Spesifikasi</label>
+                <input
+                  type="text"
+                  value={quickDeskripsi}
+                  onChange={(e) => setQuickDeskripsi(e.target.value)}
+                  className="input text-xs"
+                  placeholder="Keterangan singkat spesifikasi barang..."
+                />
+              </div>
+
               <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 text-[11px] text-emerald-800">
-                💡 Barang ini langsung ditambahkan ke master persediaan dengan stok 0, lalu otomatis terpilih di formulir transaksi masuk Anda.
+                💡 Barang ini langsung didaftarkan ke master barang lengkap dengan Kategori, Satuan, dan Lokasinya, lalu otomatis terpilih di formulir transaksi masuk Anda.
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-dark-100">

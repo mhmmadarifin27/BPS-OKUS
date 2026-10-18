@@ -21,6 +21,12 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Hilangkan ikon mata bawaan Microsoft Edge agar tidak dobel mata */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none !important;
+  }
+
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 6px;

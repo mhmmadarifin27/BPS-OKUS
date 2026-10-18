@@ -10,7 +10,7 @@ export const mockCurrentUser: User = {
   id: 'admin-001',
   name: 'Admin Persediaan',
   nip: '199003142010011001',
-  email: 'admin@bps-okus.go.id',
+  email: 'arifinkembar2@gmail.com',
   role: 'admin',
   bidang: 'Subbagian Umum',
   avatar_url: null,
@@ -20,6 +20,7 @@ export const mockCurrentUser: User = {
 
 export const mockUsers: User[] = [
   mockCurrentUser,
+  { id: 'usr-000', name: 'Pegawai BPS OKU Selatan', nip: '199505122018011001', email: 'okusbps@gmail.com', role: 'user', bidang: 'Tim Statistik Sosial', avatar_url: null, is_active: true, created_at: '2026-01-01' },
   { id: 'usr-001', name: 'Ahmad Fauzi', nip: '199112052012011002', email: 'ahmad@bps-okus.go.id', role: 'user', bidang: 'Tim Statistik Sosial', avatar_url: null, is_active: true, created_at: '2026-01-15' },
   { id: 'usr-002', name: 'Siti Nurhaliza', nip: '199205182013012003', email: 'siti@bps-okus.go.id', role: 'user', bidang: 'Tim Pertanian', avatar_url: null, is_active: true, created_at: '2026-01-15' },
   { id: 'usr-003', name: 'Budi Santoso', nip: '199307252014011004', email: 'budi@bps-okus.go.id', role: 'user', bidang: 'Tim Statistik Distribusi', avatar_url: null, is_active: true, created_at: '2026-02-01' },

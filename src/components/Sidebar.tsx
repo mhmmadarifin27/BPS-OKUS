@@ -126,35 +126,51 @@ export default function Sidebar({
       >
         {/* Header */}
         <div className={cn(
-          'flex items-center h-16 px-4 flex-shrink-0',
+          'flex items-center h-16 px-3.5 flex-shrink-0',
           isCollapsed ? 'justify-center' : 'justify-between'
         )}>
-          {!isCollapsed && (
-            <div className="flex items-center gap-3 animate-fade-in">
-              <div className="w-10 h-10 rounded-xl bg-white p-1.5 flex items-center justify-center shadow-md flex-shrink-0 ring-2 ring-bps-orange/30">
-                <img
-                  src="/images/logo-bps.svg"
-                  alt="Logo BPS"
-                  className="w-full h-full object-contain"
-                />
+          {!isCollapsed ? (
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2.5 animate-fade-in min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-white p-1.5 flex items-center justify-center shadow-md flex-shrink-0 ring-2 ring-bps-orange/30">
+                  <img
+                    src="/images/logo-bps.svg"
+                    alt="Logo BPS"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-xs font-black text-white tracking-wider leading-none truncate">SIMPAN OKUS</h1>
+                  <p className="text-[7.5px] text-amber-300 font-extrabold mt-1 tracking-tight truncate uppercase">
+                    BPS OKU SELATAN
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h1 className="text-sm font-extrabold text-white tracking-wider leading-none">SIMPAN OKUS</h1>
-                <p className="text-[8.5px] text-amber-300 font-bold mt-1 tracking-tight truncate uppercase" title="Sistem Informasi Manajemen Persediaan">
-                  SISTEM INFORMASI MANAJEMEN PERSEDIAAN
-                </p>
-              </div>
-            </div>
-          )}
 
-          {isCollapsed && (
-            <div className="w-10 h-10 rounded-xl bg-white p-1.5 flex items-center justify-center shadow-md ring-2 ring-bps-orange/30">
+              {/* Tombol Ciutkan di atas samping logo dan tulisan BPS */}
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-all flex-shrink-0 ml-1.5"
+                title="Ciutkan Menu"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="w-10 h-10 rounded-xl bg-white p-1.5 flex items-center justify-center shadow-md ring-2 ring-bps-orange/30 hover:ring-white transition-all group relative"
+              title="Klik untuk Luaskan Menu"
+            >
               <img
                 src="/images/logo-bps.svg"
                 alt="Logo BPS"
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain group-hover:opacity-30 transition-opacity"
               />
-            </div>
+              <ChevronRight className="w-5 h-5 text-bps-blue absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
           )}
 
           {/* Mobile close */}
@@ -233,7 +249,7 @@ export default function Sidebar({
         </nav>
 
         {/* Role indicator */}
-        <div className="px-3 py-2 border-t border-white/10 flex-shrink-0">
+        <div className="px-3 py-3 border-t border-white/10 flex-shrink-0">
           {!isCollapsed ? (
             <div className={cn(
               'px-3 py-2 rounded-xl text-xs flex items-center justify-between',
@@ -263,23 +279,6 @@ export default function Sidebar({
               />
             </div>
           )}
-        </div>
-
-        {/* Collapse toggle */}
-        <div className="border-t border-white/10 p-3 flex-shrink-0 hidden lg:block">
-          <button
-            onClick={onToggleCollapse}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all text-sm"
-          >
-            {isCollapsed ? (
-              <ChevronRight className="w-4 h-4" />
-            ) : (
-              <>
-                <ChevronLeft className="w-4 h-4" />
-                <span>Ciutkan</span>
-              </>
-            )}
-          </button>
         </div>
       </aside>
     </>
