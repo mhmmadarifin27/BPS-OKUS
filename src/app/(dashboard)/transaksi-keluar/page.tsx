@@ -114,6 +114,15 @@ export default function TransaksiKeluarPage() {
 
     // Polling sync berkala setiap 5 detik agar input dari teman/pegawai lain otomatis masuk ke admin
     const syncInterval = setInterval(() => {
+      // Jangan overwrite stok jika sedang ada proses update
+      if (!(window as any).__stockUpdating) {
+        fetchAndSyncBarang().then((cloudBarang) => {
+          if (cloudBarang && cloudBarang.length > 0) {
+            loadedBarang = cloudBarang;
+            setBarangList(cloudBarang);
+          }
+        });
+      }
       fetchAndSyncTransaksiKeluar(loadedBarang).then((synced) => {
         if (synced) {
           setTransaksiList(synced);
@@ -200,8 +209,11 @@ export default function TransaksiKeluarPage() {
     setBarangList(nextBarang);
     localStorage.setItem('sipersedia_barang_list', JSON.stringify(nextBarang));
 
+    // Blokir polling overwrite selama update stok berjalan
+    (window as any).__stockUpdating = true;
     // Tunggu semua PUT stok ke cloud selesai dulu
     await Promise.all(stockUpdates);
+    (window as any).__stockUpdating = false;
 
     const updatedTrx: TransaksiKeluar = { ...trx, status: 'approved' };
     const updatedList = transaksiList.map(t => t.id === trx.id ? updatedTrx : t);

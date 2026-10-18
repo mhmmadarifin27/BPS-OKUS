@@ -187,6 +187,8 @@ export default function BarangPage() {
 
     // Polling sinkronisasi real-time setiap 7 detik
     const syncInterval = setInterval(() => {
+      // Jangan overwrite jika update stok sedang berjalan (pakai flag global)
+      if ((window as any).__stockUpdating) return;
       fetchAndSyncBarang().then((cloudBarang) => {
         if (cloudBarang && cloudBarang.length > 0) {
           setBarangList(cloudBarang);
@@ -379,7 +381,7 @@ export default function BarangPage() {
   const totalStokHabis = barangList.filter((b) => b.stok === 0).length;
 
   // Handler Submit Permintaan Cepat dari Katalog
-  const handleQuickRequestSubmit = (e: React.FormEvent) => {
+  const handleQuickRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickRequestItem) return;
 
@@ -438,7 +440,11 @@ export default function BarangPage() {
 
     // Kirim transaksi ke cloud database secara real-time
     pushTransaksiKeluar(newTrx);
-    updateBarangStockRemote(quickRequestItem.id, Math.max(0, quickRequestItem.stok - Number(quickRequestJumlah)));
+
+    // Blokir polling overwrite selama update stok berjalan
+    (window as any).__stockUpdating = true;
+    await updateBarangStockRemote(quickRequestItem.id, Math.max(0, quickRequestItem.stok - Number(quickRequestJumlah)));
+    (window as any).__stockUpdating = false;
 
     // Update sisa stok lokal dan localStorage
     setBarangList((prev) => {
