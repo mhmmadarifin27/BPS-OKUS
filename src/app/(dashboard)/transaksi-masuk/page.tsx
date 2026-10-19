@@ -493,14 +493,19 @@ export default function TransaksiMasukPage() {
       showToast(`Dokumen transaksi masuk ${newTrx.no_dokumen} (${preparedItems.length} item) berhasil dicatat!`, 'success');
     }
 
-    // Daftarkan master barang baru jika ada
+    // Daftarkan master barang baru jika ada (dengan stok yang sudah terhitung benar)
     newBarangToPush.forEach(nb => {
-      pushBarang(nb);
+      const actualStok = nextBarang.find(b => b.id === nb.id)?.stok ?? nb.stok;
+      pushBarang({ ...nb, stok: actualStok });
     });
 
-    // Update stok di Cloud Database
-    nextBarang.forEach(b => {
-      updateBarangStockRemote(b.id, b.stok);
+    // Update stok di Cloud Database hanya untuk item yang terlibat di transaksi
+    // ponytail: Hanya update item dalam transaksi, hindari n-loop ke 80+ item
+    preparedItems.forEach(item => {
+      const bObj = nextBarang.find(b => b.id === item.id_barang);
+      if (bObj) {
+        updateBarangStockRemote(bObj.id, bObj.stok);
+      }
     });
 
     setBarangList(nextBarang);

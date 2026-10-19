@@ -33,11 +33,11 @@ export default function LoginPage() {
       }));
     } else {
       localStorage.setItem('sipersedia_user', JSON.stringify({
-        id: 'usr-001',
+        id: 'usr-000',
         name: nameCustom || 'Pegawai BPS OKU Selatan',
         email: emailCustom || 'okusbps@gmail.com',
         role: 'user',
-        bidang: 'Tim Statistik Sosial',
+        bidang: '',
       }));
     }
     router.push('/dashboard');

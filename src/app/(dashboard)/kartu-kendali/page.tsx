@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { mockKartuKendali, mockBarang, mockTransaksiKeluar, mockTransaksiMasuk } from '@/lib/mock-data';
 import { DATA_DAFTAR_PERSEDIAAN_PDF1, type DaftarPersediaanPDFItem } from '@/lib/data-daftar-persediaan-pdf1';
-import { TIM_PEMOHON_LIST } from '@/types';
+import { TIM_PEMOHON_LIST, getStoredTimList, formatNamaPJ, TimPemohon } from '@/types';
 import type { KartuKendali, Barang, TransaksiKeluar, TransaksiMasuk } from '@/types';
 import { cn, formatDateShort, formatNumber } from '@/lib/utils';
 import KopSurat from '@/components/KopSurat';
@@ -42,7 +42,17 @@ export default function KartuKendaliPage() {
   const [inputJumlah, setInputJumlah] = useState<number>(1);
   const [inputUraian, setInputUraian] = useState<string>('');
   const [inputHargaSatuan, setInputHargaSatuan] = useState<number>(0);
-  const [inputTimPemohon, setInputTimPemohon] = useState<string>('tim-sosial');
+  const [timList, setTimList] = useState<TimPemohon[]>(() => {
+    if (typeof window !== 'undefined') return getStoredTimList();
+    return TIM_PEMOHON_LIST;
+  });
+  const [inputTimPemohon, setInputTimPemohon] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const list = getStoredTimList();
+      return list[0]?.id || 'tim-umum';
+    }
+    return 'tim-umum';
+  });
   const [notification, setNotification] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -104,6 +114,17 @@ export default function KartuKendaliPage() {
     fetchAndSyncTransaksiMasuk(curBarang).then((mData) => {
       if (mData) setTransaksiMasukList(mData);
     });
+
+    const handleTimUpdate = () => {
+      setTimList(getStoredTimList());
+    };
+    window.addEventListener('timListUpdated', handleTimUpdate);
+    window.addEventListener('storage', handleTimUpdate);
+
+    return () => {
+      window.removeEventListener('timListUpdated', handleTimUpdate);
+      window.removeEventListener('storage', handleTimUpdate);
+    };
   }, [refreshKey]);
 
   // Helper fungsi untuk menghitung kartu kendali lengkap bagi barang tertentu
@@ -670,7 +691,7 @@ export default function KartuKendaliPage() {
     } else {
       // === Buat record Transaksi Keluar baru ===
       const existingKeluar = [...transaksiKeluarList];
-      const timObj = TIM_PEMOHON_LIST.find(t => t.id === inputTimPemohon) || TIM_PEMOHON_LIST[1];
+      const timObj = timList.find(t => t.id === inputTimPemohon) || timList[0] || TIM_PEMOHON_LIST[1];
       const docNo = `BK-${new Date(inputTanggal).getFullYear()}/${String(new Date(inputTanggal).getMonth() + 1).padStart(2, '0')}/${String(existingKeluar.length + 1).padStart(3, '0')}`;
       const newTrx: TransaksiKeluar = {
         id: Date.now(),
@@ -678,7 +699,7 @@ export default function KartuKendaliPage() {
         tanggal: inputTanggal,
         tim_pemohon: timObj.id,
         nama_tim: timObj.nama_tim,
-        penanggung_jawab: timObj.penanggung_jawab,
+        penanggung_jawab: formatNamaPJ(timObj.penanggung_jawab),
         nip_pj: timObj.nip_pj,
         items: [{
           id_barang: activeBarang.id,
@@ -1487,14 +1508,14 @@ export default function KartuKendaliPage() {
               {/* Tim Pemohon (hanya untuk keluar) */}
               {inputJenis === 'keluar' && (
                 <div>
-                  <label className="block text-xs font-bold text-dark-700 mb-1.5">Tim Pemohon</label>
+                  <label className="block text-xs font-bold text-dark-700 mb-1.5">Tim Pemohon & Penanggung Jawab</label>
                   <select
                     value={inputTimPemohon}
                     onChange={e => setInputTimPemohon(e.target.value)}
-                    className="input py-2 text-xs w-full"
+                    className="input py-2 text-xs w-full font-medium"
                   >
-                    {TIM_PEMOHON_LIST.map(tim => (
-                      <option key={tim.id} value={tim.id}>{tim.nama_tim} — {tim.penanggung_jawab}</option>
+                    {timList.map(tim => (
+                      <option key={tim.id} value={tim.id}>{tim.nama_tim} — PJ: {formatNamaPJ(tim.penanggung_jawab)}</option>
                     ))}
                   </select>
                 </div>

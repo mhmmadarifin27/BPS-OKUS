@@ -51,6 +51,11 @@ export default function DashboardLayout({
           router.replace('/dashboard');
           return;
         }
+        // Bersihkan bidang lama 'Tim Statistik Sosial' untuk Pegawai BPS OKU Selatan
+        if (parsed.bidang === 'Tim Statistik Sosial' || (!parsed.bidang && parsed.role !== 'admin')) {
+          parsed.bidang = '';
+          localStorage.setItem('sipersedia_user', JSON.stringify(parsed));
+        }
         setUser(parsed);
       } catch {
         router.replace('/login');

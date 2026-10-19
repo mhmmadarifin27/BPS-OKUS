@@ -3,7 +3,8 @@
 // Memastikan data aplikasi selalu siap untuk uji coba fitur per fitur
 // ==========================================
 
-import { ALL_81_BARANG_BPS, SAMPLE_TRANSAKSI_MASUK, SAMPLE_TRANSAKSI_KELUAR } from './mock-data';
+import { ALL_81_BARANG_BPS, SAMPLE_TRANSAKSI_MASUK, SAMPLE_TRANSAKSI_KELUAR, mockUsers } from './mock-data';
+import { TIM_PEMOHON_LIST, formatNamaPJ } from '@/types';
 
 export const DATA_STORE_VERSION = 'v20261012_lean_6_clean';
 
@@ -59,6 +60,67 @@ export function initOrMigrateStore(): boolean {
         { id: 3, nama: 'Ruang Arsip', deskripsi: 'Ruang penyimpanan dokumen dan cetakan', jumlah_barang: 1 },
         { id: 4, nama: 'Gudang Utama', deskripsi: 'Ruang penyimpanan utama lantai 1', jumlah_barang: 1 },
       ]));
+    }
+
+    // Inisialisasi atau migrasi nama Daftar Tim & Penanggung Jawab (PJ) ke format title-case rapi
+    const existingTim = localStorage.getItem('sipersedia_tim_list');
+    if (!existingTim) {
+      localStorage.setItem('sipersedia_tim_list', JSON.stringify(TIM_PEMOHON_LIST));
+    } else {
+      try {
+        const parsedTim = JSON.parse(existingTim);
+        if (Array.isArray(parsedTim)) {
+          const updatedTim = parsedTim.map((t: any) => ({
+            ...t,
+            penanggung_jawab: formatNamaPJ(t.penanggung_jawab),
+          }));
+          localStorage.setItem('sipersedia_tim_list', JSON.stringify(updatedTim));
+        }
+      } catch {}
+    }
+
+    // Bersihkan manajemen user: Hanya Admin Persediaan & Pegawai BPS OKU Selatan
+    const existingUsers = localStorage.getItem('sipersedia_users_list');
+    if (!existingUsers) {
+      localStorage.setItem('sipersedia_users_list', JSON.stringify(mockUsers));
+    } else {
+      try {
+        const parsedUsers = JSON.parse(existingUsers);
+        const dummyNames = ['Ahmad Fauzi', 'Siti Nurhaliza', 'Budi Santoso', 'Dewi Lestari', 'Riko Pratama', 'Maya Anggraini', 'Hendra Wijaya', 'Putri Rahayu'];
+        if (Array.isArray(parsedUsers) && parsedUsers.some((u: any) => dummyNames.includes(u.name))) {
+          let cleanedUsers = parsedUsers.filter((u: any) => !dummyNames.includes(u.name));
+          const adminIdx = cleanedUsers.findIndex((u: any) => u.role === 'admin');
+          if (adminIdx !== -1) {
+            cleanedUsers[adminIdx] = {
+              ...cleanedUsers[adminIdx],
+              name: 'Admin Persediaan',
+              email: 'arifinkembar2@gmail.com',
+            };
+          }
+          const userIdx = cleanedUsers.findIndex((u: any) => u.role === 'user');
+          if (userIdx !== -1) {
+            cleanedUsers[userIdx] = {
+              ...cleanedUsers[userIdx],
+              name: 'Pegawai BPS OKU Selatan',
+              email: 'okusbps@gmail.com',
+              bidang: '',
+            };
+          }
+          localStorage.setItem('sipersedia_users_list', JSON.stringify(cleanedUsers));
+        }
+      } catch {}
+    }
+
+    // Bersihkan akun login aktif dari 'Tim Statistik Sosial' jika ada
+    const activeStored = localStorage.getItem('sipersedia_user');
+    if (activeStored) {
+      try {
+        const parsed = JSON.parse(activeStored);
+        if (parsed.bidang === 'Tim Statistik Sosial' || (!parsed.bidang && parsed.role !== 'admin')) {
+          parsed.bidang = '';
+          localStorage.setItem('sipersedia_user', JSON.stringify(parsed));
+        }
+      } catch {}
     }
 
     localStorage.setItem('sipersedia_data_version', DATA_STORE_VERSION);

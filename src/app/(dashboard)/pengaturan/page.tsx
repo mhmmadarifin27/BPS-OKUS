@@ -6,10 +6,10 @@ import {
   BarChart3, Shield, Database, Globe, Info, User, Lock,
   Camera, CheckCircle2, Save, X, Building, KeyRound, Sparkles,
   Users, Copy, Check, CheckCircle, ExternalLink, Trash2, Image as ImageIcon,
-  RotateCcw, RefreshCw
+  RotateCcw, RefreshCw, Edit2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { TIM_PEMOHON_LIST, PEJABAT_KPB, PENGELOLA_PERSEDIAAN } from '@/types';
+import { TIM_PEMOHON_LIST, PEJABAT_KPB, PENGELOLA_PERSEDIAAN, getStoredTimList, saveStoredTimList, formatNamaPJ, TimPemohon } from '@/types';
 import { resetToTestingMode, loadSimulationData, wipeAllData } from '@/lib/data-management';
 import { supabase } from '@/lib/supabase';
 
@@ -29,9 +29,9 @@ function PengaturanContent() {
   const [activeTab, setActiveTab] = useState<'profil' | 'tim' | 'instansi'>('profil');
   const [userProfile, setUserProfile] = useState<UserProfile>({
     id: 'admin-001',
-    name: 'Admin Persediaan BPS',
+    name: 'Admin Persediaan',
     nip: '199003142010011001',
-    email: 'admin@bps-okus.go.id',
+    email: 'arifinkembar2@gmail.com',
     role: 'admin',
     bidang: 'Subbagian Umum',
     avatar_url: null,
@@ -42,6 +42,15 @@ function PengaturanContent() {
     nip: '',
     email: '',
     bidang: '',
+  });
+
+  // State untuk Daftar Tim & PJ yang bisa di-edit
+  const [timList, setTimList] = useState<TimPemohon[]>(TIM_PEMOHON_LIST);
+  const [editingTim, setEditingTim] = useState<TimPemohon | null>(null);
+  const [timFormData, setTimFormData] = useState({
+    nama_tim: '',
+    penanggung_jawab: '',
+    nip_pj: '',
   });
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -68,7 +77,7 @@ function PengaturanContent() {
     }
   }, [searchParams]);
 
-  // Load profil aktif dari localStorage
+  // Load profil aktif & daftar tim dari localStorage
   useEffect(() => {
     const loadStoredUser = () => {
       const stored = localStorage.getItem('sipersedia_user');
@@ -76,12 +85,12 @@ function PengaturanContent() {
         try {
           const u = JSON.parse(stored);
           const resolved: UserProfile = {
-            id: u.id || 'usr-001',
-            name: u.name || (u.role === 'admin' ? 'Admin Persediaan BPS' : 'Ahmad Fauzi'),
-            nip: u.nip || (u.role === 'admin' ? '199003142010011001' : '199112052012011002'),
-            email: u.email || (u.role === 'admin' ? 'admin@bps-okus.go.id' : 'pegawai@bps-okus.go.id'),
+            id: u.id || (u.role === 'admin' ? 'admin-001' : 'usr-000'),
+            name: u.name || (u.role === 'admin' ? 'Admin Persediaan' : 'Pegawai BPS OKU Selatan'),
+            nip: u.nip || (u.role === 'admin' ? '199003142010011001' : '199505122018011001'),
+            email: u.email || (u.role === 'admin' ? 'arifinkembar2@gmail.com' : 'okusbps@gmail.com'),
             role: u.role || 'admin',
-            bidang: u.bidang || (u.role === 'admin' ? 'Subbagian Umum' : 'Tim Statistik Sosial'),
+            bidang: (u.bidang === 'Tim Statistik Sosial' || (!u.bidang && u.role !== 'admin')) ? '' : (u.bidang || (u.role === 'admin' ? 'Subbagian Umum' : '')),
             avatar_url: u.avatar_url || null,
           };
           setUserProfile(resolved);
@@ -105,10 +114,61 @@ function PengaturanContent() {
     };
 
     loadStoredUser();
+    setTimList(getStoredTimList());
+
+    const handleTimUpdate = () => {
+      setTimList(getStoredTimList());
+    };
 
     window.addEventListener('profileUpdated', loadStoredUser);
-    return () => window.removeEventListener('profileUpdated', loadStoredUser);
+    window.addEventListener('timListUpdated', handleTimUpdate);
+    window.addEventListener('storage', handleTimUpdate);
+
+    return () => {
+      window.removeEventListener('profileUpdated', loadStoredUser);
+      window.removeEventListener('timListUpdated', handleTimUpdate);
+      window.removeEventListener('storage', handleTimUpdate);
+    };
   }, []);
+
+  const handleOpenEditTim = (tim: TimPemohon) => {
+    setEditingTim(tim);
+    setTimFormData({
+      nama_tim: tim.nama_tim,
+      penanggung_jawab: formatNamaPJ(tim.penanggung_jawab),
+      nip_pj: tim.nip_pj || '',
+    });
+  };
+
+  const handleSaveEditTim = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTim) return;
+    if (!timFormData.nama_tim.trim() || !timFormData.penanggung_jawab.trim()) {
+      setNotification({ type: 'error', message: 'Nama Tim dan Nama Penanggung Jawab wajib diisi!' });
+      return;
+    }
+
+    const updated = timList.map(t => {
+      if (t.id === editingTim.id) {
+        return {
+          ...t,
+          nama_tim: timFormData.nama_tim.trim(),
+          penanggung_jawab: formatNamaPJ(timFormData.penanggung_jawab.trim()),
+          nip_pj: timFormData.nip_pj.trim(),
+        };
+      }
+      return t;
+    });
+
+    setTimList(updated);
+    saveStoredTimList(updated);
+    setEditingTim(null);
+    setNotification({
+      type: 'success',
+      message: `Daftar Tim & Penanggung Jawab (${timFormData.nama_tim}) berhasil diperbarui dan disinkronkan ke seluruh sistem!`,
+    });
+    setTimeout(() => setNotification(null), 4500);
+  };
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -561,7 +621,7 @@ function PengaturanContent() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-3.5">
-              {TIM_PEMOHON_LIST.map((tim, index) => (
+              {timList.map((tim, index) => (
                 <div
                   key={tim.id}
                   className="p-4 rounded-xl border border-dark-100 bg-white hover:border-bps-blue/40 hover:shadow-xs transition-all flex flex-col justify-between"
@@ -576,7 +636,7 @@ function PengaturanContent() {
                     <h4 className="font-bold text-dark-800 text-sm">{tim.nama_tim}</h4>
                     <div className="mt-2 space-y-0.5">
                       <p className="text-[11px] text-dark-400">Penanggung Jawab (PJ):</p>
-                      <p className="text-xs font-bold text-dark-700">{tim.penanggung_jawab}</p>
+                      <p className="text-xs font-bold text-dark-700">{formatNamaPJ(tim.penanggung_jawab)}</p>
                     </div>
                   </div>
 
@@ -584,24 +644,123 @@ function PengaturanContent() {
                     <span className="text-[11px] font-mono text-dark-500">
                       NIP: {tim.nip_pj || '-'}
                     </span>
-                    {tim.nip_pj && (
+                    <div className="flex items-center gap-1.5">
                       <button
-                        onClick={() => handleCopyNip(tim.nip_pj, tim.id)}
-                        className="text-bps-blue hover:text-bps-blue-700 text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                        onClick={() => handleOpenEditTim(tim)}
+                        className="text-bps-blue hover:text-bps-blue-700 text-[11px] font-semibold flex items-center gap-1 transition-colors px-2 py-1 rounded-lg hover:bg-bps-blue-50 border border-bps-blue/20"
+                        title="Edit Tim & Penanggung Jawab"
                       >
-                        {copiedNip === tim.id ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                        <span>{copiedNip === tim.id ? 'Tersalin' : 'Salin NIP'}</span>
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Edit</span>
                       </button>
-                    )}
+                      {tim.nip_pj && (
+                        <button
+                          onClick={() => handleCopyNip(tim.nip_pj, tim.id)}
+                          className="text-dark-500 hover:text-dark-700 text-[11px] font-semibold flex items-center gap-1 transition-colors px-2 py-1 rounded-lg hover:bg-dark-50"
+                        >
+                          {copiedNip === tim.id ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                          <span>{copiedNip === tim.id ? 'Tersalin' : 'Salin NIP'}</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
+
+          {/* Modal Edit Tim & Penanggung Jawab */}
+          {editingTim && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-slide-in-up overflow-hidden">
+                <div className="flex items-center justify-between p-5 border-b border-dark-100 bg-gradient-to-r from-bps-blue-50/50 to-white">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-bps-blue-100/60 text-bps-blue flex items-center justify-center">
+                      <Edit2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-dark-800 text-sm">Edit Tim & Penanggung Jawab</h3>
+                      <p className="text-[11px] text-dark-400">ID Tim: {editingTim.id}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTim(null)}
+                    className="p-1.5 rounded-lg text-dark-400 hover:bg-dark-100 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveEditTim} className="p-5 space-y-4">
+                  <div>
+                    <label className="input-label text-xs font-semibold text-dark-700">
+                      Nama Tim / Subbagian <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={timFormData.nama_tim}
+                      onChange={(e) => setTimFormData({ ...timFormData, nama_tim: e.target.value })}
+                      className="input text-xs font-medium"
+                      placeholder="Contoh: Tim Statistik Distribusi"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="input-label text-xs font-semibold text-dark-700">
+                      Nama Penanggung Jawab (PJ) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={timFormData.penanggung_jawab}
+                      onChange={(e) => setTimFormData({ ...timFormData, penanggung_jawab: e.target.value })}
+                      className="input text-xs font-medium"
+                      placeholder="Contoh: Uswar M. Alghifari A.P, S.Tr.Stat."
+                    />
+                    <p className="text-[10px] text-dark-400 mt-1">
+                      💡 Format kapital otomatis: huruf depan nama kapital dan gelar akademik kapital (Contoh: <code>Uswar M. Alghifari A.P, S.Tr.Stat.</code>)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="input-label text-xs font-semibold text-dark-700">
+                      NIP Penanggung Jawab (PJ)
+                    </label>
+                    <input
+                      type="text"
+                      value={timFormData.nip_pj}
+                      onChange={(e) => setTimFormData({ ...timFormData, nip_pj: e.target.value })}
+                      className="input text-xs font-mono"
+                      placeholder="Contoh: 19980512 202012 1002"
+                    />
+                  </div>
+
+                  <div className="pt-3 border-t border-dark-100 flex items-center justify-end gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setEditingTim(null)}
+                      className="btn-secondary text-xs py-2 px-4"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn-primary text-xs py-2 px-5 inline-flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Simpan Perubahan</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

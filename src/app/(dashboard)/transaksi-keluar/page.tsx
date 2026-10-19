@@ -6,7 +6,7 @@ import {
   X, FileText, CheckCircle2, AlertTriangle, RefreshCw
 } from 'lucide-react';
 import { mockTransaksiKeluar, mockBarang } from '@/lib/mock-data';
-import { TIM_PEMOHON_LIST } from '@/types';
+import { TIM_PEMOHON_LIST, getStoredTimList, formatNamaPJ, TimPemohon } from '@/types';
 import type { TransaksiKeluar, Barang, JenisPengeluaran } from '@/types';
 import { cn, formatDateShort, formatDate, formatTanggalTandaTangan } from '@/lib/utils';
 import KopSurat from '@/components/KopSurat';
@@ -34,7 +34,29 @@ export default function TransaksiKeluarPage() {
   const [editItem, setEditItem] = useState<TransaksiKeluar | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
 
-  const [selectedTim, setSelectedTim] = useState('tim-sosial');
+  const [timList, setTimList] = useState<TimPemohon[]>(() => {
+    if (typeof window !== 'undefined') {
+      return getStoredTimList();
+    }
+    return TIM_PEMOHON_LIST;
+  });
+  const [selectedTim, setSelectedTim] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('sipersedia_user');
+      if (stored) {
+        try {
+          const u = JSON.parse(stored);
+          const list = getStoredTimList();
+          if (u.bidang && u.bidang !== 'Tim Statistik Sosial') {
+            const m = list.find(t => t.id === u.bidang || t.nama_tim === u.bidang);
+            if (m) return m.id;
+          }
+          return list[0]?.id || 'tim-umum';
+        } catch {}
+      }
+    }
+    return 'tim-umum';
+  });
   const [formJenisPengeluaran, setFormJenisPengeluaran] = useState<JenisPengeluaran>('habis_pakai');
   const [barangList, setBarangList] = useState<Barang[]>(() => {
     if (typeof window !== 'undefined') {
@@ -130,6 +152,13 @@ export default function TransaksiKeluarPage() {
       });
     }, 5000);
 
+    // Listen for tim list updates
+    const handleTimUpdate = () => {
+      setTimList(getStoredTimList());
+    };
+    window.addEventListener('timListUpdated', handleTimUpdate);
+    window.addEventListener('storage', handleTimUpdate);
+
     // Handle query params from Katalog (e.g. ?barang_id=1&action=minta)
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -139,8 +168,19 @@ export default function TransaksiKeluarPage() {
       if (action === 'minta' || bId) {
         const targetId = Number(bId);
         const bObj = mockBarang.find(b => b.id === targetId);
+        const currentTimList = getStoredTimList();
+        let defaultTim = currentTimList[0]?.id || 'tim-umum';
+        if (stored) {
+          try {
+            const u = JSON.parse(stored);
+            if (u.bidang && u.bidang !== 'Tim Statistik Sosial') {
+              const m = currentTimList.find(t => t.id === u.bidang || t.nama_tim === u.bidang);
+              if (m) defaultTim = m.id;
+            }
+          } catch {}
+        }
         setEditItem(null);
-        setSelectedTim('tim-sosial');
+        setSelectedTim(defaultTim);
         setFormJenisPengeluaran('habis_pakai');
         setTglPermintaan(new Date().toISOString().split('T')[0]);
         setKeteranganPermintaan(bObj ? `Kebutuhan operasional: ${bObj.nama_barang}` : '');
@@ -151,7 +191,11 @@ export default function TransaksiKeluarPage() {
       }
     }
 
-    return () => clearInterval(syncInterval);
+    return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener('timListUpdated', handleTimUpdate);
+      window.removeEventListener('storage', handleTimUpdate);
+    };
   }, []);
 
   const isUser = userRole === 'user';
@@ -169,15 +213,17 @@ export default function TransaksiKeluarPage() {
     setEditItem(null);
     // Link ke tim/bidang pegawai saat ini jika ada
     const stored = localStorage.getItem('sipersedia_user');
-    let defaultTim = 'tim-sosial';
+    let defaultTim = timList[0]?.id || 'tim-umum';
     if (stored) {
       try {
         const u = JSON.parse(stored);
-        const match = TIM_PEMOHON_LIST.find(t => 
-          t.nama_tim.toLowerCase().includes((u.bidang || '').toLowerCase()) ||
-          t.penanggung_jawab.toLowerCase().includes((u.name || '').toLowerCase())
-        );
-        if (match) defaultTim = match.id;
+        if (u.bidang && u.bidang !== 'Tim Statistik Sosial') {
+          const match = timList.find(t => 
+            t.nama_tim.toLowerCase().includes(u.bidang.toLowerCase()) ||
+            t.id === u.bidang
+          );
+          if (match) defaultTim = match.id;
+        }
       } catch {}
     }
     setSelectedTim(defaultTim);
@@ -272,7 +318,7 @@ export default function TransaksiKeluarPage() {
   };
 
   const handleSave = async () => {
-    const timObj = TIM_PEMOHON_LIST.find(t => t.id === selectedTim) || TIM_PEMOHON_LIST[1];
+    const timObj = timList.find(t => t.id === selectedTim) || timList[0] || TIM_PEMOHON_LIST[1];
 
     // Validasi stok: Tidak boleh melebihi sisa stok (saat edit: stok saat ini + jumlah lama transaksi ini)
     for (let i = 0; i < formItems.length; i++) {
@@ -328,7 +374,7 @@ export default function TransaksiKeluarPage() {
       tanggal: tglPermintaan,
       tim_pemohon: timObj.id,
       nama_tim: timObj.nama_tim,
-      penanggung_jawab: timObj.penanggung_jawab,
+      penanggung_jawab: formatNamaPJ(timObj.penanggung_jawab),
       nip_pj: timObj.nip_pj,
       jenis_pengeluaran: formJenisPengeluaran,
       status: 'pending',
@@ -469,7 +515,7 @@ export default function TransaksiKeluarPage() {
             className="input text-xs py-2 md:w-48 bg-white"
           >
             <option value="all">Semua Tim / Subbag</option>
-            {TIM_PEMOHON_LIST.map((t) => (
+            {timList.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.nama_tim}
               </option>
@@ -662,11 +708,11 @@ export default function TransaksiKeluarPage() {
                     <select
                       value={selectedTim}
                       onChange={(e) => setSelectedTim(e.target.value)}
-                      className="input text-xs"
+                      className="input text-xs font-medium text-dark-800"
                     >
-                      {TIM_PEMOHON_LIST.map(t => (
+                      {timList.map(t => (
                         <option key={t.id} value={t.id}>
-                          {t.nama_tim} — PJ: {t.penanggung_jawab}
+                          {t.nama_tim} — PJ: {formatNamaPJ(t.penanggung_jawab)}
                         </option>
                       ))}
                     </select>
@@ -700,12 +746,12 @@ export default function TransaksiKeluarPage() {
 
                 {/* Info Card Penanggung Jawab Tim yang Dipilih */}
                 {(() => {
-                  const activeTim = TIM_PEMOHON_LIST.find(t => t.id === selectedTim) || TIM_PEMOHON_LIST[2];
+                  const activeTim = timList.find(t => t.id === selectedTim) || timList[0] || TIM_PEMOHON_LIST[2];
                   return (
                     <div className="p-2.5 bg-bps-blue-50/70 rounded-xl border border-bps-blue/20 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs animate-fade-in">
                       <div className="flex items-center gap-1.5">
                         <span className="text-dark-500 font-medium">Penanggung Jawab:</span>
-                        <span className="font-bold text-dark-800">{activeTim.penanggung_jawab}</span>
+                        <span className="font-bold text-dark-800">{formatNamaPJ(activeTim.penanggung_jawab)}</span>
                       </div>
                       <div className="text-dark-500 text-[11px]">
                         NIP: <span className="font-mono font-semibold text-dark-700">{activeTim.nip_pj}</span>
@@ -1009,7 +1055,7 @@ export default function TransaksiKeluarPage() {
                   <div className="sig-space" />
                   <p>
                     <span className="sig-name">
-                      {showPrintPreview.penanggung_jawab || '............................................................'}
+                      {formatNamaPJ(showPrintPreview.penanggung_jawab) || '............................................................'}
                     </span>
                   </p>
                   <p className="sig-nip">NIP. {showPrintPreview.nip_pj || '....................................'}</p>

@@ -20,15 +20,7 @@ export const mockCurrentUser: User = {
 
 export const mockUsers: User[] = [
   mockCurrentUser,
-  { id: 'usr-000', name: 'Pegawai BPS OKU Selatan', nip: '199505122018011001', email: 'okusbps@gmail.com', role: 'user', bidang: 'Tim Statistik Sosial', avatar_url: null, is_active: true, created_at: '2026-01-01' },
-  { id: 'usr-001', name: 'Ahmad Fauzi', nip: '199112052012011002', email: 'ahmad@bps-okus.go.id', role: 'user', bidang: 'Tim Statistik Sosial', avatar_url: null, is_active: true, created_at: '2026-01-15' },
-  { id: 'usr-002', name: 'Siti Nurhaliza', nip: '199205182013012003', email: 'siti@bps-okus.go.id', role: 'user', bidang: 'Tim Pertanian', avatar_url: null, is_active: true, created_at: '2026-01-15' },
-  { id: 'usr-003', name: 'Budi Santoso', nip: '199307252014011004', email: 'budi@bps-okus.go.id', role: 'user', bidang: 'Tim Statistik Distribusi', avatar_url: null, is_active: true, created_at: '2026-02-01' },
-  { id: 'usr-004', name: 'Dewi Lestari', nip: '199408122015012005', email: 'dewi@bps-okus.go.id', role: 'user', bidang: 'Tim IPDS', avatar_url: null, is_active: true, created_at: '2026-02-01' },
-  { id: 'usr-005', name: 'Riko Pratama', nip: '199510302016011006', email: 'riko@bps-okus.go.id', role: 'user', bidang: 'Tim Nerwilis', avatar_url: null, is_active: true, created_at: '2026-03-01' },
-  { id: 'usr-006', name: 'Maya Anggraini', nip: '199601172017012007', email: 'maya@bps-okus.go.id', role: 'user', bidang: 'Subbagian Umum', avatar_url: null, is_active: true, created_at: '2026-03-01' },
-  { id: 'usr-007', name: 'Hendra Wijaya', nip: '199703082018011008', email: 'hendra@bps-okus.go.id', role: 'user', bidang: 'Tim PEK dan KTIP', avatar_url: null, is_active: true, created_at: '2026-04-01' },
-  { id: 'usr-008', name: 'Putri Rahayu', nip: '199809212019012009', email: 'putri@bps-okus.go.id', role: 'user', bidang: 'Kepala', avatar_url: null, is_active: false, created_at: '2026-04-01' },
+  { id: 'usr-000', name: 'Pegawai BPS OKU Selatan', nip: '199505122018011001', email: 'okusbps@gmail.com', role: 'user', bidang: '', avatar_url: null, is_active: true, created_at: '2026-01-01' },
 ];
 
 export const SAMPLE_BARANG_BPS: Barang[] = [
@@ -190,7 +182,7 @@ export const SAMPLE_TRANSAKSI_KELUAR: TransaksiKeluar[] = [
     tanggal: '2026-08-25',
     tim_pemohon: 'tim-sosial',
     nama_tim: 'Tim Statistik Sosial',
-    penanggung_jawab: 'FATONAH AMINI, S.Tr.Stat.',
+    penanggung_jawab: 'Fatonah Amini, S.Tr.Stat.',
     nip_pj: '19990317 202104 2001',
     items: [
       { id_barang: 2, jumlah: 5, keterangan: 'Kegiatan Susenas & Sakernas', barang: SAMPLE_BARANG_BPS[1] },
@@ -207,7 +199,7 @@ export const SAMPLE_TRANSAKSI_KELUAR: TransaksiKeluar[] = [
     tanggal: '2026-08-27',
     tim_pemohon: 'tim-umum',
     nama_tim: 'Subbagian Umum',
-    penanggung_jawab: 'SURYA WAGITO, SST',
+    penanggung_jawab: 'Surya Wagito, SST',
     nip_pj: '19910814 201412 1001',
     items: [
       { id_barang: 5, jumlah: 4, keterangan: 'Pengarsipan Surat Masuk & Keluar', barang: SAMPLE_BARANG_BPS[4] },
@@ -223,7 +215,7 @@ export const SAMPLE_TRANSAKSI_KELUAR: TransaksiKeluar[] = [
     tanggal: '2026-09-15',
     tim_pemohon: 'tim-ipds',
     nama_tim: 'Tim IPDS',
-    penanggung_jawab: 'DANU ABDI SAPUTRA, S.Tr.Stat.',
+    penanggung_jawab: 'Danu Abdi Saputra, S.Tr.Stat.',
     nip_pj: '20000626 202201 1005',
     items: [
       { id_barang: 4, jumlah: 1, keterangan: 'Pencetakan Publikasi Daerah Dalam Angka', barang: SAMPLE_BARANG_BPS[3] },

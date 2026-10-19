@@ -8,7 +8,7 @@ import {
   AlertTriangle, Filter, Check, Clock, Layers, Printer, FileText
 } from 'lucide-react';
 import { mockBarang, mockTransaksiKeluar } from '@/lib/mock-data';
-import { TIM_PEMOHON_LIST } from '@/types';
+import { TIM_PEMOHON_LIST, getStoredTimList, formatNamaPJ, TimPemohon } from '@/types';
 import type { Barang, TransaksiKeluar } from '@/types';
 import { formatNumber, cn } from '@/lib/utils';
 import {
@@ -89,8 +89,28 @@ export default function BarangPage() {
   const [detailItem, setDetailItem] = useState<Barang | null>(null);
 
   // Modal Permintaan Cepat ATK (khusus Role User)
+  const [timList, setTimList] = useState<TimPemohon[]>(() => {
+    if (typeof window !== 'undefined') return getStoredTimList();
+    return TIM_PEMOHON_LIST;
+  });
   const [quickRequestItem, setQuickRequestItem] = useState<Barang | null>(null);
-  const [quickRequestTim, setQuickRequestTim] = useState('tim-sosial');
+  const [quickRequestTim, setQuickRequestTim] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('sipersedia_user');
+      if (stored) {
+        try {
+          const u = JSON.parse(stored);
+          const list = getStoredTimList();
+          if (u.bidang && u.bidang !== 'Tim Statistik Sosial') {
+            const m = list.find(t => t.id === u.bidang || t.nama_tim === u.bidang);
+            if (m) return m.id;
+          }
+          return list[0]?.id || 'tim-umum';
+        } catch {}
+      }
+    }
+    return 'tim-umum';
+  });
   const [quickRequestJumlah, setQuickRequestJumlah] = useState(1);
   const [quickRequestKeterangan, setQuickRequestKeterangan] = useState('');
 
@@ -102,11 +122,22 @@ export default function BarangPage() {
   } | null>(null);
 
   useEffect(() => {
+    const handleTimUpdate = () => {
+      setTimList(getStoredTimList());
+    };
+    window.addEventListener('timListUpdated', handleTimUpdate);
+    window.addEventListener('storage', handleTimUpdate);
+
     const stored = localStorage.getItem('sipersedia_user');
     if (stored) {
       try {
         const u = JSON.parse(stored);
         setUserRole(u.role);
+        if (u.bidang && u.bidang !== 'Tim Statistik Sosial') {
+          const list = getStoredTimList();
+          const m = list.find(t => t.id === u.bidang || t.nama_tim === u.bidang);
+          if (m) setQuickRequestTim(m.id);
+        }
       } catch (e) {
         console.error(e);
       }
@@ -396,7 +427,7 @@ export default function BarangPage() {
       return;
     }
 
-    const timObj = TIM_PEMOHON_LIST.find((t) => t.id === quickRequestTim) || TIM_PEMOHON_LIST[2];
+    const timObj = timList.find((t) => t.id === quickRequestTim) || timList[0] || TIM_PEMOHON_LIST[2];
     const today = new Date().toISOString().split('T')[0];
 
     // Ambil riwayat transaksi yang ada
@@ -420,7 +451,7 @@ export default function BarangPage() {
       tanggal: today,
       tim_pemohon: timObj.id,
       nama_tim: timObj.nama_tim,
-      penanggung_jawab: timObj.penanggung_jawab,
+      penanggung_jawab: formatNamaPJ(timObj.penanggung_jawab),
       nip_pj: timObj.nip_pj,
       items: [
         {
@@ -439,24 +470,8 @@ export default function BarangPage() {
     localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify(updatedTrx));
 
     // Kirim transaksi ke cloud database secara real-time
+    // ponytail: Pengurangan stok gudang hanya saat disetujui (approval) oleh Admin di Transaksi Keluar agar tidak double deduction
     pushTransaksiKeluar(newTrx);
-
-    // Blokir polling overwrite selama update stok berjalan
-    (window as any).__stockUpdating = true;
-    await updateBarangStockRemote(quickRequestItem.id, Math.max(0, quickRequestItem.stok - Number(quickRequestJumlah)));
-    (window as any).__stockUpdating = false;
-
-    // Update sisa stok lokal dan localStorage
-    setBarangList((prev) => {
-      const updated = prev.map((b) => {
-        if (b.id === quickRequestItem.id) {
-          return { ...b, stok: Math.max(0, b.stok - Number(quickRequestJumlah)) };
-        }
-        return b;
-      });
-      localStorage.setItem('sipersedia_barang_list', JSON.stringify(updated));
-      return updated;
-    });
 
     const requestedName = quickRequestItem.nama_barang;
     const requestedQty = quickRequestJumlah;
@@ -963,24 +978,24 @@ export default function BarangPage() {
                 <select
                   value={quickRequestTim}
                   onChange={(e) => setQuickRequestTim(e.target.value)}
-                  className="input text-xs"
+                  className="input text-xs font-medium text-dark-800"
                   required
                 >
-                  {TIM_PEMOHON_LIST.map((t) => (
+                  {timList.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.nama_tim} — PJ: {t.penanggung_jawab}
+                      {t.nama_tim} — PJ: {formatNamaPJ(t.penanggung_jawab)}
                     </option>
                   ))}
                 </select>
 
                 {/* Info Card Penanggung Jawab Tim yang Dipilih */}
                 {(() => {
-                  const activeTim = TIM_PEMOHON_LIST.find((t) => t.id === quickRequestTim) || TIM_PEMOHON_LIST[2];
+                  const activeTim = timList.find((t) => t.id === quickRequestTim) || timList[0] || TIM_PEMOHON_LIST[2];
                   return (
                     <div className="mt-2 p-2.5 bg-bps-blue-50/70 rounded-xl border border-bps-blue/20 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs animate-fade-in">
                       <div className="flex items-center gap-1.5">
                         <span className="text-dark-500 font-medium">Penanggung Jawab:</span>
-                        <span className="font-bold text-dark-800">{activeTim.penanggung_jawab}</span>
+                        <span className="font-bold text-dark-800">{formatNamaPJ(activeTim.penanggung_jawab)}</span>
                       </div>
                       <div className="text-dark-500 text-[11px]">
                         NIP: <span className="font-mono font-semibold text-dark-700">{activeTim.nip_pj}</span>

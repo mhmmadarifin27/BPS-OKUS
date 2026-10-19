@@ -7,11 +7,13 @@ import {
   Check, Lock, Upload, KeyRound
 } from 'lucide-react';
 import { mockUsers } from '@/lib/mock-data';
-import type { User as UserType, UserRole } from '@/types';
+import type { User as UserType, UserRole, TimPemohon } from '@/types';
+import { getStoredTimList } from '@/types';
 import { cn } from '@/lib/utils';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<UserType[]>([]);
+  const [timList, setTimList] = useState<TimPemohon[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState<'all' | 'admin' | 'user'>('all');
@@ -36,7 +38,7 @@ export default function UsersPage() {
     nip: '',
     email: '',
     role: 'user' as UserRole,
-    bidang: 'Tim Statistik Sosial',
+    bidang: '',
     is_active: true,
     avatar_url: null as string | null,
     password: '',
@@ -44,11 +46,42 @@ export default function UsersPage() {
 
   // Load users from localStorage or fallback to mockUsers
   useEffect(() => {
+    setTimList(getStoredTimList());
     const saved = localStorage.getItem('sipersedia_users_list');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          const dummyNames = ['Ahmad Fauzi', 'Siti Nurhaliza', 'Budi Santoso', 'Dewi Lestari', 'Riko Pratama', 'Maya Anggraini', 'Hendra Wijaya', 'Putri Rahayu'];
+          const hasDummy = parsed.some((u: UserType) => dummyNames.includes(u.name));
+
+          if (hasDummy) {
+            let cleaned = parsed.filter((u: UserType) => !dummyNames.includes(u.name));
+            const adminIdx = cleaned.findIndex((u: UserType) => u.role === 'admin');
+            if (adminIdx !== -1) {
+              cleaned[adminIdx] = {
+                ...cleaned[adminIdx],
+                name: 'Admin Persediaan',
+                email: 'arifinkembar2@gmail.com',
+                nip: cleaned[adminIdx].nip || '199003142010011001',
+              };
+            }
+            const userIdx = cleaned.findIndex((u: UserType) => u.role === 'user');
+            if (userIdx !== -1) {
+              cleaned[userIdx] = {
+                ...cleaned[userIdx],
+                name: 'Pegawai BPS OKU Selatan',
+                email: 'okusbps@gmail.com',
+                bidang: '',
+                nip: cleaned[userIdx].nip || '199505122018011001',
+              };
+            }
+            setUsers(cleaned);
+            localStorage.setItem('sipersedia_users_list', JSON.stringify(cleaned));
+            setIsLoaded(true);
+            return;
+          }
+
           setUsers(parsed);
           setIsLoaded(true);
           return;
@@ -74,7 +107,7 @@ export default function UsersPage() {
       nip: '',
       email: '',
       role: 'user',
-      bidang: 'Tim Statistik Sosial',
+      bidang: '',
       is_active: true,
       avatar_url: null,
       password: '',
@@ -723,14 +756,12 @@ export default function UsersPage() {
                     value={formData.bidang}
                     onChange={(e) => setFormData({ ...formData, bidang: e.target.value })}
                   >
-                    <option value="Subbagian Umum">Subbagian Umum</option>
-                    <option value="Tim Statistik Sosial">Tim Statistik Sosial</option>
-                    <option value="Tim Statistik Distribusi">Tim Statistik Distribusi</option>
-                    <option value="Tim Pertanian & Kehutanan">Tim Pertanian &amp; Kehutanan</option>
-                    <option value="Tim IPDS">Tim IPDS</option>
-                    <option value="Tim Neraca (Nerwilis)">Tim Neraca (Nerwilis)</option>
-                    <option value="Tim PEK dan KTIP">Tim PEK dan KTIP</option>
-                    <option value="Kepala">Kepala BPS</option>
+                    <option value="">- Tanpa Tim / Umum -</option>
+                    {timList.map(t => (
+                      <option key={t.id} value={t.nama_tim}>
+                        {t.nama_tim} — PJ: {t.penanggung_jawab}
+                      </option>
+                    ))}
                   </select>
                   <p className="text-[10px] text-dark-400 mt-1">
                     Menentukan unit pemohon persediaan pada dokumen SPB.

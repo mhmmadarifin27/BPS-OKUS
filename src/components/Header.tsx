@@ -61,11 +61,12 @@ export default function Header({
     if (stored) {
       try {
         const u = JSON.parse(stored);
+        const resolvedBidang = (u.bidang === 'Tim Statistik Sosial' || (!u.bidang && u.role !== 'admin')) ? '' : (u.bidang || '');
         setEditForm({
           name: u.name || userName,
-          nip: u.nip || (u.role === 'admin' ? '199003142010011001' : '199112052012011002'),
-          email: u.email || (u.role === 'admin' ? 'admin@bps-okus.go.id' : 'pegawai@bps-okus.go.id'),
-          bidang: u.bidang || userBidang,
+          nip: u.nip || (u.role === 'admin' ? '199003142010011001' : '199505122018011001'),
+          email: u.email || (u.role === 'admin' ? 'arifinkembar2@gmail.com' : 'okusbps@gmail.com'),
+          bidang: resolvedBidang,
           avatar_url: u.avatar_url || null,
         });
       } catch (e) {
@@ -228,7 +229,9 @@ export default function Header({
               </div>
               <div className="hidden md:block text-left">
                 <p className="text-xs font-bold text-dark-800 leading-none">{userName}</p>
-                <p className="text-[11px] text-dark-400 mt-0.5">{userBidang}</p>
+                {userBidang && userBidang !== 'Tim Statistik Sosial' && (
+                  <p className="text-[11px] text-dark-400 mt-0.5">{userBidang}</p>
+                )}
               </div>
               <ChevronDown className="w-4 h-4 text-dark-400 hidden md:block" />
             </button>
@@ -237,7 +240,9 @@ export default function Header({
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-dark-100 overflow-hidden animate-fade-in z-50">
                 <div className="p-4 border-b border-dark-100 bg-gradient-to-br from-dark-50 to-white">
                   <p className="font-bold text-sm text-dark-800">{userName}</p>
-                  <p className="text-xs text-dark-500 mt-0.5">{userBidang}</p>
+                  {userBidang && userBidang !== 'Tim Statistik Sosial' && (
+                    <p className="text-xs text-dark-500 mt-0.5">{userBidang}</p>
+                  )}
                   <div className="mt-2 flex items-center gap-1.5">
                     <span className={cn(
                       "badge text-[10px] font-bold px-2 py-0.5",
