@@ -16,6 +16,7 @@ import {
   fetchAndSyncBarang,
   updateBarangStockRemote,
   pushBarang,
+  urutkanTransaksi,
 } from '@/lib/sync-service';
 
 interface FormMasukItem {
@@ -175,9 +176,7 @@ export default function TransaksiMasukPage() {
             const map = new Map<string, TransaksiMasuk>();
             prev.forEach(t => map.set(t.no_dokumen, t));
             synced.forEach(t => map.set(t.no_dokumen, t));
-            return Array.from(map.values()).sort(
-              (a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()
-            );
+            return urutkanTransaksi(Array.from(map.values()));
           });
         }
       });

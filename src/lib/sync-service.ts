@@ -214,6 +214,26 @@ export function parseRemoteTransaksiKeluar(rows: any[], barangList: Barang[]): T
   });
 }
 
+// ==========================================================
+// ATURAN URUTAN DOKUMEN YANG SAMA DI SEMUA PERANGKAT:
+// 1) tanggal transaksi  2) waktu dokumen dibuat  3) nomor dokumen  4) id
+// Semua urut ke bawah = yang terbaru paling atas. Tanpa ini, dokumen
+// ber-tanggal sama akan tampil berurutan berbeda di tiap perangkat.
+// ==========================================================
+export function urutkanTransaksi<
+  T extends { tanggal?: string | null; created_at?: string | null; no_dokumen?: string; id?: any }
+>(list: T[]): T[] {
+  return [...list].sort((a, b) => {
+    const dTanggal = new Date(b.tanggal || '').getTime() - new Date(a.tanggal || '').getTime();
+    if (dTanggal !== 0) return dTanggal;
+    const dCreated = new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
+    if (dCreated !== 0) return dCreated;
+    const dDoc = String(b.no_dokumen || '').localeCompare(String(a.no_dokumen || ''), 'id', { numeric: true });
+    if (dDoc !== 0) return dDoc;
+    return (Number(b.id) || 0) - (Number(a.id) || 0);
+  });
+}
+
 export async function fetchAndSyncTransaksiKeluar(barangList: Barang[]): Promise<TransaksiKeluar[] | null> {
   try {
     const res = await fetch('/api/transaksi-keluar', { cache: 'no-store' });
@@ -229,9 +249,7 @@ export async function fetchAndSyncTransaksiKeluar(barangList: Barang[]): Promise
       localList.forEach((t) => mergedMap.set(t.no_dokumen, t));
       parsed.forEach((t) => mergedMap.set(t.no_dokumen, t));
 
-      const merged = Array.from(mergedMap.values()).sort(
-        (a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()
-      );
+      const merged = urutkanTransaksi(Array.from(mergedMap.values()));
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify(merged));
@@ -371,9 +389,7 @@ export async function fetchAndSyncTransaksiMasuk(barangList: Barang[]): Promise<
         }
       });
 
-      const merged = Array.from(mergedMap.values()).sort(
-        (a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()
-      );
+      const merged = urutkanTransaksi(Array.from(mergedMap.values()));
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('sipersedia_transaksi_masuk', JSON.stringify(merged));
