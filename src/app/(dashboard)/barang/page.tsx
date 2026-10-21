@@ -466,9 +466,27 @@ export default function BarangPage() {
       }
     }
 
-    const docNo = `BK-${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${String(
-      existingTrx.length + 1
-    ).padStart(3, '0')}`;
+    const d = new Date();
+    const prefix = `BK-${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/`;
+    const existingDocs = new Set<string>();
+    existingTrx.forEach((t: any) => { if (t?.no_dokumen) existingDocs.add(t.no_dokumen); });
+
+    let maxSeq = 0;
+    existingDocs.forEach(doc => {
+      if (doc && doc.startsWith(prefix)) {
+        const numPart = doc.slice(prefix.length);
+        const num = parseInt(numPart, 10);
+        if (!isNaN(num) && num > maxSeq) {
+          maxSeq = num;
+        }
+      }
+    });
+
+    let nextSeq = maxSeq + 1;
+    while (existingDocs.has(`${prefix}${String(nextSeq).padStart(3, '0')}`)) {
+      nextSeq++;
+    }
+    const docNo = `${prefix}${String(nextSeq).padStart(3, '0')}`;
 
     const newTrx: TransaksiKeluar = {
       id: Date.now(),

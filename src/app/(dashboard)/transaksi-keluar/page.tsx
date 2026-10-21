@@ -139,7 +139,7 @@ export default function TransaksiKeluarPage() {
       // Jangan overwrite stok jika sedang ada proses update
       if (!(window as any).__stockUpdating) {
         fetchAndSyncBarang().then((cloudBarang) => {
-          if (cloudBarang && cloudBarang.length > 0) {
+          if (cloudBarang) {
             loadedBarang = cloudBarang;
             setBarangList(cloudBarang);
           }
@@ -322,6 +322,45 @@ export default function TransaksiKeluarPage() {
     }));
   };
 
+  const generateNextBKDocNo = (tanggal: string, list: TransaksiKeluar[]): string => {
+    const d = new Date(tanggal || new Date());
+    const year = isNaN(d.getFullYear()) ? new Date().getFullYear() : d.getFullYear();
+    const month = String(isNaN(d.getMonth()) ? (new Date().getMonth() + 1) : (d.getMonth() + 1)).padStart(2, '0');
+    const prefix = `BK-${year}/${month}/`;
+
+    const existingDocs = new Set<string>();
+    list.forEach(t => { if (t?.no_dokumen) existingDocs.add(t.no_dokumen); });
+
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('sipersedia_transaksi_keluar');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((t: any) => { if (t?.no_dokumen) existingDocs.add(t.no_dokumen); });
+          }
+        }
+      } catch {}
+    }
+
+    let maxSeq = 0;
+    existingDocs.forEach(doc => {
+      if (doc && doc.startsWith(prefix)) {
+        const numPart = doc.slice(prefix.length);
+        const num = parseInt(numPart, 10);
+        if (!isNaN(num) && num > maxSeq) {
+          maxSeq = num;
+        }
+      }
+    });
+
+    let nextSeq = maxSeq + 1;
+    while (existingDocs.has(`${prefix}${String(nextSeq).padStart(3, '0')}`)) {
+      nextSeq++;
+    }
+    return `${prefix}${String(nextSeq).padStart(3, '0')}`;
+  };
+
   const handleSave = async () => {
     const timObj = timList.find(t => t.id === selectedTim) || timList[0] || TIM_PEMOHON_LIST[1];
 
@@ -375,7 +414,7 @@ export default function TransaksiKeluarPage() {
 
     const newTrx: TransaksiKeluar = {
       id: Date.now(),
-      no_dokumen: `BK-${new Date(tglPermintaan).getFullYear()}/${String(new Date(tglPermintaan).getMonth() + 1).padStart(2, '0')}/${String(transaksiList.length + 1).padStart(3, '0')}`,
+      no_dokumen: generateNextBKDocNo(tglPermintaan, transaksiList),
       tanggal: tglPermintaan,
       tim_pemohon: timObj.id,
       nama_tim: timObj.nama_tim,

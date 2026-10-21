@@ -92,8 +92,35 @@ export async function POST(req: Request) {
       }
     }
 
+    let docNo = body.no_dokumen;
+
+    // Cek apakah no_dokumen ini sudah ada di database
+    const { data: existingDoc } = await supabase
+      .from('transaksi_masuk')
+      .select('id, no_dokumen')
+      .eq('no_dokumen', docNo)
+      .maybeSingle();
+
+    if (existingDoc) {
+      const isSameRecord = Boolean(body.id && String(body.id) === String(existingDoc.id));
+      if (!isSameRecord) {
+        // Dokumen baru yang bentrok nomor karena 2 user menginput bersamaan:
+        const { data: allDocs } = await supabase
+          .from('transaksi_masuk')
+          .select('no_dokumen');
+        const existingSet = new Set((allDocs || []).map((x: any) => x.no_dokumen));
+        const d = new Date(body.tanggal || new Date());
+        const prefix = `BM-${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/`;
+        let seq = 1;
+        while (existingSet.has(`${prefix}${String(seq).padStart(3, '0')}`)) {
+          seq++;
+        }
+        docNo = `${prefix}${String(seq).padStart(3, '0')}`;
+      }
+    }
+
     const payload = {
-      no_dokumen: body.no_dokumen,
+      no_dokumen: docNo,
       id_barang: primaryIdBarang,
       jumlah: body.jumlah || (items.reduce((s: number, i: any) => s + (i.jumlah || 0), 0)) || 1,
       tanggal: body.tanggal || new Date().toISOString().split('T')[0],

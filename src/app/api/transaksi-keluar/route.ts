@@ -91,9 +91,59 @@ export async function POST(req: Request) {
       }
     }
 
+    let docNo = body.no_dokumen;
+
+    // Cek apakah no_dokumen ini sudah ada di database
+    const { data: existingDoc } = await supabase
+      .from('transaksi_keluar')
+      .select('id, no_dokumen, status, pemohon')
+      .eq('no_dokumen', docNo)
+      .maybeSingle();
+
+    if (existingDoc) {
+      const isStatusUpdate = Boolean(body.status && body.status !== existingDoc.status);
+      const isSameRecord = Boolean(body.id && String(body.id) === String(existingDoc.id));
+
+      if (isStatusUpdate || isSameRecord) {
+        // Pembaruan status (approval / rejection / edit) pada dokumen yang sama
+        const updateData: any = {
+          status: body.status || existingDoc.status,
+        };
+        if (body.approved_by) updateData.approved_by = body.approved_by;
+        if (body.keterangan) {
+          updateData.keterangan = typeof body.keterangan === 'string'
+            ? body.keterangan
+            : JSON.stringify(body.keterangan);
+        }
+        const { data, error } = await supabase
+          .from('transaksi_keluar')
+          .update(updateData)
+          .eq('no_dokumen', docNo)
+          .select();
+        if (error) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        return NextResponse.json({ success: true, data });
+      }
+
+      // Dokumen baru yang konflik nomornya karena 2+ user menginput bersamaan:
+      // Naikkan nomor urut otomatis agar permintaan user ini tidak menimpa user lain!
+      const { data: allDocs } = await supabase
+        .from('transaksi_keluar')
+        .select('no_dokumen');
+      const existingSet = new Set((allDocs || []).map((x: any) => x.no_dokumen));
+      const d = new Date(body.tanggal || new Date());
+      const prefix = `BK-${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/`;
+      let seq = 1;
+      while (existingSet.has(`${prefix}${String(seq).padStart(3, '0')}`)) {
+        seq++;
+      }
+      docNo = `${prefix}${String(seq).padStart(3, '0')}`;
+    }
+
     // Map payload into columns existing in Supabase table
     const payload = {
-      no_dokumen: body.no_dokumen,
+      no_dokumen: docNo,
       id_barang: primaryIdBarang,
       jumlah: body.jumlah || (items.reduce((s: number, i: any) => s + (i.jumlah || 0), 0)) || 1,
       tanggal: body.tanggal || new Date().toISOString().split('T')[0],
