@@ -36,37 +36,43 @@ export const LOKASI_LOOKUP: Record<number, string> = {
 // ==========================================================
 
 export function parseRemoteBarang(rows: any[]): Barang[] {
-  return rows.map((r) => ({
-    id: r.id,
-    kode_barang: r.kode_barang,
-    nama_barang: r.nama_barang,
-    id_kategori: r.id_kategori || 1,
-    id_satuan: r.id_satuan || 1,
-    id_lokasi: r.id_lokasi || 1,
-    stok: typeof r.stok === 'number' ? r.stok : 0,
-    stok_minimum: typeof r.stok_minimum === 'number' ? r.stok_minimum : 5,
-    foto_url: r.foto_url || null,
-    deskripsi: r.deskripsi || null,
-    created_at: r.created_at || new Date().toISOString(),
-    updated_at: r.updated_at || new Date().toISOString(),
-    kategori: {
+  return rows.map((r) => {
+    const katObj = r.kategori || {
       id: r.id_kategori || 1,
       nama_kategori: KATEGORI_LOOKUP[r.id_kategori] || 'Alat Tulis Kantor',
       deskripsi: null,
       created_at: '',
-    },
-    satuan: {
+    };
+    const satObj = r.satuan || {
       id: r.id_satuan || 1,
       nama_satuan: SATUAN_LOOKUP[r.id_satuan] || 'Buah',
       created_at: '',
-    },
-    lokasi: {
+    };
+    const lokObj = r.lokasi || {
       id: r.id_lokasi || 1,
-      nama_lokasi: LOKASI_LOOKUP[r.id_lokasi] || 'Gudang ATK',
+      nama_lokasi: LOKASI_LOOKUP[r.id_lokasi] || 'Gudang Persediaan Barang',
       deskripsi: null,
       created_at: '',
-    },
-  }));
+    };
+
+    return {
+      id: r.id,
+      kode_barang: r.kode_barang,
+      nama_barang: r.nama_barang,
+      id_kategori: r.id_kategori || katObj.id || 1,
+      id_satuan: r.id_satuan || satObj.id || 1,
+      id_lokasi: r.id_lokasi || lokObj.id || 1,
+      stok: typeof r.stok === 'number' ? r.stok : 0,
+      stok_minimum: typeof r.stok_minimum === 'number' ? r.stok_minimum : 5,
+      foto_url: r.foto_url || null,
+      deskripsi: r.deskripsi || null,
+      created_at: r.created_at || new Date().toISOString(),
+      updated_at: r.updated_at || new Date().toISOString(),
+      kategori: katObj,
+      satuan: satObj,
+      lokasi: lokObj,
+    };
+  });
 }
 
 export async function fetchAndSyncBarang(): Promise<Barang[] | null> {

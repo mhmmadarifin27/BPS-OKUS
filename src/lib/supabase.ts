@@ -13,6 +13,62 @@ export function getServiceSupabase() {
   return supabase;
 }
 
+/**
+ * Validasi dan petakan id_kategori, id_satuan, id_lokasi ke ID yang benar-benar ada di tabel master Supabase.
+ * Menghindari error Postgres 23503 (Foreign Key Constraint Violation) jika user pernah menghapus/mengubah master data.
+ */
+export async function sanitizeBarangFK(supabaseClient: any, input: any) {
+  try {
+    const [katRes, satRes, lokRes] = await Promise.all([
+      supabaseClient.from('kategori').select('id, nama_kategori'),
+      supabaseClient.from('satuan').select('id, nama_satuan'),
+      supabaseClient.from('lokasi').select('id, nama_lokasi'),
+    ]);
+
+    const kats: any[] = katRes.data || [];
+    const sats: any[] = satRes.data || [];
+    const loks: any[] = lokRes.data || [];
+
+    // 1. Kategori
+    let idKat: number | null = typeof input.id_kategori === 'number' && kats.some((x) => x.id === input.id_kategori)
+      ? input.id_kategori
+      : null;
+    const katName = input.nama_kategori || (typeof input.kategori === 'string' ? input.kategori : input.kategori?.nama_kategori);
+    if (!idKat && katName) {
+      const f = kats.find((x) => x.nama_kategori?.toLowerCase() === String(katName).toLowerCase());
+      if (f) idKat = f.id;
+    }
+    if (!idKat && kats.length > 0) idKat = kats[0].id;
+
+    // 2. Satuan
+    let idSat: number | null = typeof input.id_satuan === 'number' && sats.some((x) => x.id === input.id_satuan)
+      ? input.id_satuan
+      : null;
+    const satName = input.nama_satuan || (typeof input.satuan === 'string' ? input.satuan : input.satuan?.nama_satuan);
+    if (!idSat && satName) {
+      const f = sats.find((x) => x.nama_satuan?.toLowerCase() === String(satName).toLowerCase());
+      if (f) idSat = f.id;
+    }
+    if (!idSat && sats.length > 0) idSat = sats[0].id;
+
+    // 3. Lokasi
+    let idLok: number | null = typeof input.id_lokasi === 'number' && loks.some((x) => x.id === input.id_lokasi)
+      ? input.id_lokasi
+      : null;
+    const lokName = input.nama_lokasi || (typeof input.lokasi === 'string' ? input.lokasi : input.lokasi?.nama_lokasi);
+    if (!idLok && lokName) {
+      const f = loks.find((x) => x.nama_lokasi?.toLowerCase() === String(lokName).toLowerCase());
+      if (f) idLok = f.id;
+    }
+    if (!idLok && loks.length > 0) idLok = loks[0].id;
+
+    return { id_kategori: idKat, id_satuan: idSat, id_lokasi: idLok };
+  } catch (e) {
+    console.warn('[sanitizeBarangFK] Fallback null:', e);
+    return { id_kategori: null, id_satuan: null, id_lokasi: null };
+  }
+}
+
 // ==========================================
 // Supabase Database Schema (SQL)
 // Jalankan query ini di Supabase SQL Editor

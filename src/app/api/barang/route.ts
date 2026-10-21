@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServiceSupabase } from '@/lib/supabase';
+import { getServiceSupabase, sanitizeBarangFK } from '@/lib/supabase';
 
 // ==========================================================
 // API Barang
@@ -96,7 +96,7 @@ export async function GET() {
     const supabase = getServiceSupabase();
     const { data: barangs, error } = await supabase
       .from('barang')
-      .select('*')
+      .select('*, kategori(id, nama_kategori), satuan(id, nama_satuan), lokasi(id, nama_lokasi)')
       .order('id', { ascending: true });
 
     if (error) {
@@ -189,21 +189,12 @@ export async function POST(req: Request) {
       };
       if (body.nama_barang) masterUpdate.nama_barang = body.nama_barang;
       if (body.kode_barang && body.kode_barang !== '-') masterUpdate.kode_barang = body.kode_barang;
-      const idKategori =
-        typeof body.id_kategori === 'number'
-          ? body.id_kategori
-          : (typeof body.kategori?.id === 'number' ? body.kategori.id : undefined);
-      if (idKategori !== undefined) masterUpdate.id_kategori = idKategori;
-      const idSatuan =
-        typeof body.id_satuan === 'number'
-          ? body.id_satuan
-          : (typeof body.satuan?.id === 'number' ? body.satuan.id : undefined);
-      if (idSatuan !== undefined) masterUpdate.id_satuan = idSatuan;
-      const idLokasi =
-        typeof body.id_lokasi === 'number'
-          ? body.id_lokasi
-          : (typeof body.lokasi?.id === 'number' ? body.lokasi.id : undefined);
-      if (idLokasi !== undefined) masterUpdate.id_lokasi = idLokasi;
+      
+      const sanitized = await sanitizeBarangFK(supabase, body);
+      if (sanitized.id_kategori !== null) masterUpdate.id_kategori = sanitized.id_kategori;
+      if (sanitized.id_satuan !== null) masterUpdate.id_satuan = sanitized.id_satuan;
+      if (sanitized.id_lokasi !== null) masterUpdate.id_lokasi = sanitized.id_lokasi;
+
       if (typeof body.stok_minimum === 'number') masterUpdate.stok_minimum = body.stok_minimum;
       if (body.deskripsi !== undefined) masterUpdate.deskripsi = body.deskripsi;
       if (body.foto_url !== undefined) masterUpdate.foto_url = body.foto_url;
@@ -223,13 +214,14 @@ export async function POST(req: Request) {
     }
 
     // BARANG BARU: stok awal = titik awal (baseline) ledger
+    const sanitized = await sanitizeBarangFK(supabase, body);
     const stokAwal = Number(body.stok) || 0;
     const payload: any = {
       kode_barang: body.kode_barang,
       nama_barang: body.nama_barang,
-      id_kategori: body.id_kategori || null,
-      id_satuan: body.id_satuan || null,
-      id_lokasi: body.id_lokasi || null,
+      id_kategori: sanitized.id_kategori,
+      id_satuan: sanitized.id_satuan,
+      id_lokasi: sanitized.id_lokasi,
       stok: stokAwal,
       stok_minimum: typeof body.stok_minimum === 'number' ? body.stok_minimum : 5,
       foto_url: body.foto_url || null,
@@ -273,10 +265,12 @@ export async function PUT(req: Request) {
     if (body.kode_barang && body.kode_barang !== '-') updateData.kode_barang = body.kode_barang;
     if (typeof body.stok_minimum === 'number') updateData.stok_minimum = body.stok_minimum;
     if (body.deskripsi !== undefined) updateData.deskripsi = body.deskripsi;
-    if (typeof body.id_kategori === 'number') updateData.id_kategori = body.id_kategori;
-    if (typeof body.id_satuan === 'number') updateData.id_satuan = body.id_satuan;
-    if (typeof body.id_lokasi === 'number') updateData.id_lokasi = body.id_lokasi;
     if (body.foto_url !== undefined) updateData.foto_url = body.foto_url;
+
+    const sanitized = await sanitizeBarangFK(supabase, body);
+    if (body.id_kategori !== undefined || body.kategori !== undefined) updateData.id_kategori = sanitized.id_kategori;
+    if (body.id_satuan !== undefined || body.satuan !== undefined) updateData.id_satuan = sanitized.id_satuan;
+    if (body.id_lokasi !== undefined || body.lokasi !== undefined) updateData.id_lokasi = sanitized.id_lokasi;
 
     const net = await hitungNetBarang(supabase, body.id);
 

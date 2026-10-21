@@ -384,6 +384,36 @@ export default function TransaksiMasukPage() {
     const newBarangToPush: Barang[] = [];
 
     // 1. Resolve setiap item (master barang yang ada atau buat baru dengan stok awal 0)
+    const findMasterId = (key: string, name: string): number | null => {
+      if (typeof window === 'undefined') return null;
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            const found = arr.find((x: any) => (x.nama || x.nama_kategori || x.nama_satuan || x.nama_lokasi)?.toLowerCase() === name.toLowerCase());
+            if (found && typeof found.id === 'number') return found.id;
+          }
+        }
+      } catch {}
+      return null;
+    };
+
+    let defaultLokId = 5;
+    let defaultLokNama = 'Gudang Persediaan Barang';
+    if (typeof window !== 'undefined') {
+      try {
+        const rawLok = localStorage.getItem('sipersedia_lokasi_list');
+        if (rawLok) {
+          const listLok = JSON.parse(rawLok);
+          if (Array.isArray(listLok) && listLok.length > 0) {
+            defaultLokId = listLok[0].id || defaultLokId;
+            defaultLokNama = listLok[0].nama || listLok[0].nama_lokasi || defaultLokNama;
+          }
+        }
+      } catch {}
+    }
+
     const preparedItems = formItems.map(item => {
       const trimmedName = item.nama_barang.trim();
       let matchedB = item.id_barang
@@ -396,23 +426,25 @@ export default function TransaksiMasukPage() {
         const nextKode = `000${String(nextId).padStart(3, '0')}`;
         const katName = item.kategori || 'Alat Tulis Kantor';
         const satName = item.satuan || 'Buah';
+        const finalKatId = findMasterId('sipersedia_kategori_list', katName) || 1;
+        const finalSatId = findMasterId('sipersedia_satuan_list', satName) || 1;
 
         matchedB = {
           id: nextId,
           kode_barang: nextKode,
           nama_barang: trimmedName,
-          id_kategori: kategoriOptions.findIndex(k => k === katName) + 1 || 1,
-          id_satuan: satuanOptions.findIndex(s => s === satName) + 1 || 1,
-          id_lokasi: 1,
+          id_kategori: finalKatId,
+          id_satuan: finalSatId,
+          id_lokasi: defaultLokId,
           stok: 0, // ponytail: Stok awal barang baru selalu 0, penambahan murni dari barang masuk
           stok_minimum: 0,
           foto_url: null,
           deskripsi: 'Ditambahkan via Transaksi Masuk',
           created_at: new Date().toISOString().split('T')[0],
           updated_at: new Date().toISOString().split('T')[0],
-          kategori: { id: 1, nama_kategori: katName, deskripsi: null, created_at: '' },
-          satuan: { id: 1, nama_satuan: satName, created_at: '' },
-          lokasi: { id: 1, nama_lokasi: 'Gudang ATK', deskripsi: null, created_at: '' },
+          kategori: { id: finalKatId, nama_kategori: katName, deskripsi: null, created_at: '' },
+          satuan: { id: finalSatId, nama_satuan: satName, created_at: '' },
+          lokasi: { id: defaultLokId, nama_lokasi: defaultLokNama, deskripsi: null, created_at: '' },
         };
         nextBarang = [matchedB, ...nextBarang];
         newBarangToPush.push(matchedB);

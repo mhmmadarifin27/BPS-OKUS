@@ -174,8 +174,8 @@ export default function BarangPage() {
       try {
         const parsed = JSON.parse(storedKat);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const names = parsed.map((k: any) => k.nama).filter(Boolean);
-          setKategoriOptions((prev) => Array.from(new Set([...names, ...prev])));
+          const names = parsed.map((k: any) => k.nama || k.nama_kategori).filter(Boolean);
+          if (names.length > 0) setKategoriOptions(names);
         }
       } catch (e) {
         console.error(e);
@@ -188,8 +188,8 @@ export default function BarangPage() {
       try {
         const parsed = JSON.parse(storedSat);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const names = parsed.map((s: any) => s.nama).filter(Boolean);
-          setSatuanOptions((prev) => Array.from(new Set([...names, ...prev])));
+          const names = parsed.map((s: any) => s.nama || s.nama_satuan).filter(Boolean);
+          if (names.length > 0) setSatuanOptions(names);
         }
       } catch (e) {
         console.error(e);
@@ -202,8 +202,8 @@ export default function BarangPage() {
       try {
         const parsed = JSON.parse(storedLok);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const names = parsed.map((l: any) => l.nama).filter(Boolean);
-          setLokasiOptions((prev) => Array.from(new Set([...names, ...prev])));
+          const names = parsed.map((l: any) => l.nama || l.nama_lokasi).filter(Boolean);
+          if (names.length > 0) setLokasiOptions(names);
         }
       } catch (e) {
         console.error(e);
@@ -266,10 +266,25 @@ export default function BarangPage() {
     // Kode barang dibuat opsional sesuai revisi mentor
     const finalKode = formKodeBarang.trim() || '-';
 
-    // Petakan nama kategori/satuan/lokasi terpilih ke id agar konsisten dengan cloud
-    const finalKategoriId = kategoriOptions.findIndex(k => k === formKategori) + 1 || 1;
-    const finalSatuanId = satuanOptions.findIndex(s => s === formSatuan) + 1 || 1;
-    const finalLokasiId = lokasiOptions.findIndex(l => l === formLokasi) + 1 || 1;
+    // Petakan nama kategori/satuan/lokasi terpilih ke ID asli dari master data
+    const findMasterId = (key: string, name: string): number | null => {
+      if (typeof window === 'undefined') return null;
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            const found = arr.find((x: any) => (x.nama || x.nama_kategori || x.nama_satuan || x.nama_lokasi)?.toLowerCase() === name.toLowerCase());
+            if (found && typeof found.id === 'number') return found.id;
+          }
+        }
+      } catch {}
+      return null;
+    };
+
+    const finalKategoriId = findMasterId('sipersedia_kategori_list', formKategori) || 1;
+    const finalSatuanId = findMasterId('sipersedia_satuan_list', formSatuan) || 1;
+    const finalLokasiId = findMasterId('sipersedia_lokasi_list', formLokasi) || 5;
 
     let updatedList: Barang[];
     if (editItem) {

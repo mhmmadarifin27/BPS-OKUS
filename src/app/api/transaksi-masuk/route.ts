@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServiceSupabase } from '@/lib/supabase';
+import { getServiceSupabase, sanitizeBarangFK } from '@/lib/supabase';
 
 export async function GET() {
   try {
@@ -34,14 +34,15 @@ export async function POST(req: Request) {
         const { data: existingB } = await supabase.from('barang').select('id, stok').eq('id', bId).maybeSingle();
         if (!existingB) {
           const bInfo = item.barang || {};
+          const sanitized = await sanitizeBarangFK(supabase, bInfo);
           // ponytail: stok awal barang baru di DB diset 0, penambahan murni dari loop update transaksi masuk di bawah
           await supabase.from('barang').upsert({
             id: bId,
             kode_barang: bInfo.kode_barang || `000${bId}`,
             nama_barang: bInfo.nama_barang || `Barang ${bId}`,
-            id_kategori: bInfo.id_kategori || 1,
-            id_satuan: bInfo.id_satuan || 1,
-            id_lokasi: bInfo.id_lokasi || 1,
+            id_kategori: sanitized.id_kategori,
+            id_satuan: sanitized.id_satuan,
+            id_lokasi: sanitized.id_lokasi,
             stok: 0,
             stok_minimum: typeof bInfo.stok_minimum === 'number' ? bInfo.stok_minimum : 5,
             deskripsi: bInfo.deskripsi || null,
@@ -58,13 +59,14 @@ export async function POST(req: Request) {
       if (!checkPrimary) {
         const fallbackName = items[0]?.barang?.nama_barang || `Barang ${primaryIdBarang}`;
         const fallbackKode = items[0]?.barang?.kode_barang || `000${primaryIdBarang}`;
+        const sanitized = await sanitizeBarangFK(supabase, items[0]?.barang || {});
         await supabase.from('barang').upsert({
           id: primaryIdBarang,
           kode_barang: fallbackKode,
           nama_barang: fallbackName,
-          id_kategori: 1,
-          id_satuan: 1,
-          id_lokasi: 1,
+          id_kategori: sanitized.id_kategori,
+          id_satuan: sanitized.id_satuan,
+          id_lokasi: sanitized.id_lokasi,
           stok: 0,
           stok_minimum: 5,
           updated_at: new Date().toISOString(),
@@ -75,13 +77,14 @@ export async function POST(req: Request) {
       if (anyB) {
         primaryIdBarang = anyB.id;
       } else {
+        const sanitized = await sanitizeBarangFK(supabase, {});
         const { data: createdB } = await supabase.from('barang').insert({
           id: 1,
           kode_barang: '000001',
-          nama_barang: 'Stabillo',
-          id_kategori: 1,
-          id_satuan: 1,
-          id_lokasi: 1,
+          nama_barang: 'Barang Uji',
+          id_kategori: sanitized.id_kategori,
+          id_satuan: sanitized.id_satuan,
+          id_lokasi: sanitized.id_lokasi,
           stok: 0,
           stok_minimum: 5,
         }).select('id').single();
