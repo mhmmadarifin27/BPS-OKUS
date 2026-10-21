@@ -146,7 +146,7 @@ export default function TransaksiMasukPage() {
 
     // Ambil data barang dari cloud
     fetchAndSyncBarang().then((cloudBarang) => {
-      if (cloudBarang && cloudBarang.length > 0) {
+      if (cloudBarang) {
         currentBarang = cloudBarang;
         setBarangList(cloudBarang);
       }

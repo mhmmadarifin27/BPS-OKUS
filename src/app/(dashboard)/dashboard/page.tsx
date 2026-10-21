@@ -46,7 +46,7 @@ export default function DashboardPage() {
       if (b) {
         try {
           const parsed = JSON.parse(b);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed)) return parsed;
         } catch {}
       }
     }
@@ -59,7 +59,7 @@ export default function DashboardPage() {
       if (m) {
         try {
           const parsed = JSON.parse(m);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed)) return parsed;
         } catch {}
       }
     }
@@ -72,7 +72,7 @@ export default function DashboardPage() {
       if (k) {
         try {
           const parsed = JSON.parse(k);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed)) return parsed;
         } catch {}
       }
     }
@@ -123,7 +123,7 @@ export default function DashboardPage() {
     // Sinkronisasi otomatis data terbaru dari cloud
     let curBarang = mockBarang;
     fetchAndSyncBarang().then((bData) => {
-      if (bData && bData.length > 0) {
+      if (bData) {
         curBarang = bData;
         setBarangList(bData);
       }
@@ -138,7 +138,7 @@ export default function DashboardPage() {
     // Polling setiap 7 detik
     const syncInterval = setInterval(() => {
       fetchAndSyncBarang().then((bData) => {
-        if (bData && bData.length > 0) setBarangList(bData);
+        if (bData) setBarangList(bData);
       });
       fetchAndSyncTransaksiMasuk(curBarang).then((mData) => {
         if (mData) setTransaksiMasukList(mData);

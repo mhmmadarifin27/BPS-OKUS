@@ -212,7 +212,7 @@ export default function BarangPage() {
 
     // Tarik data barang resmi terbaru dari Cloud Database Supabase
     fetchAndSyncBarang().then((cloudBarang) => {
-      if (cloudBarang && cloudBarang.length > 0) {
+      if (cloudBarang) {
         setBarangList(cloudBarang);
       }
     });
@@ -222,7 +222,7 @@ export default function BarangPage() {
       // Jangan overwrite jika update stok sedang berjalan (pakai flag global)
       if ((window as any).__stockUpdating) return;
       fetchAndSyncBarang().then((cloudBarang) => {
-        if (cloudBarang && cloudBarang.length > 0) {
+        if (cloudBarang) {
           setBarangList(cloudBarang);
         }
       });

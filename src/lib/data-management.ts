@@ -6,7 +6,7 @@
 import { ALL_81_BARANG_BPS, SAMPLE_TRANSAKSI_MASUK, SAMPLE_TRANSAKSI_KELUAR, mockUsers } from './mock-data';
 import { TIM_PEMOHON_LIST, formatNamaPJ } from '@/types';
 
-export const DATA_STORE_VERSION = 'v20261021_kredensial_bps_final';
+export const DATA_STORE_VERSION = 'v20261021_reset_total_0';
 
 /**
  * Inisialisasi otomatis pada awal aplikasi dimuat.

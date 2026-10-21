@@ -138,7 +138,7 @@ export const SAMPLE_BARANG_BPS: Barang[] = [
 export const ALL_81_BARANG_BPS: Barang[] = SAMPLE_BARANG_BPS;
 
 // Data Barang Aktif
-export const mockBarang: Barang[] = SAMPLE_BARANG_BPS;
+export const mockBarang: Barang[] = [];
 
 // Data Contoh Transaksi Masuk Simulasi
 export const SAMPLE_TRANSAKSI_MASUK: TransaksiMasuk[] = [
@@ -172,7 +172,7 @@ export const SAMPLE_TRANSAKSI_MASUK: TransaksiMasuk[] = [
     created_at: '2026-09-05',
   },
 ];
-export const mockTransaksiMasuk: TransaksiMasuk[] = SAMPLE_TRANSAKSI_MASUK;
+export const mockTransaksiMasuk: TransaksiMasuk[] = [];
 
 // Data Transaksi Keluar Simulasi
 export const SAMPLE_TRANSAKSI_KELUAR: TransaksiKeluar[] = [
@@ -226,7 +226,7 @@ export const SAMPLE_TRANSAKSI_KELUAR: TransaksiKeluar[] = [
     created_at: '2026-09-15',
   },
 ];
-export const mockTransaksiKeluar: TransaksiKeluar[] = SAMPLE_TRANSAKSI_KELUAR;
+export const mockTransaksiKeluar: TransaksiKeluar[] = [];
 
 export const mockDashboardStats: DashboardStats = {
   totalBarang: 6,

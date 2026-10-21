@@ -74,7 +74,7 @@ export async function fetchAndSyncBarang(): Promise<Barang[] | null> {
     const res = await fetch('/api/barang', { cache: 'no-store' });
     if (!res.ok) return null;
     const json = await res.json();
-    if (Array.isArray(json.data) && json.data.length > 0) {
+    if (Array.isArray(json.data)) {
       const parsed = parseRemoteBarang(json.data);
       if (typeof window !== 'undefined') {
         localStorage.setItem('sipersedia_barang_list', JSON.stringify(parsed));
@@ -244,12 +244,20 @@ export async function fetchAndSyncTransaksiKeluar(barangList: Barang[]): Promise
       const localStr = typeof window !== 'undefined' ? localStorage.getItem('sipersedia_transaksi_keluar') : null;
       const localList: TransaksiKeluar[] = localStr ? JSON.parse(localStr) : [];
 
-      // Merge: dahulukan data remote dari cloud
-      const mergedMap = new Map<string, TransaksiKeluar>();
-      localList.forEach((t) => mergedMap.set(t.no_dokumen, t));
-      parsed.forEach((t) => mergedMap.set(t.no_dokumen, t));
+      // Cloud adalah sumber kebenaran:
+      // Hanya dokumen yang ada di remote (cloud) yang dipertahankan.
+      const localMap = new Map<string, TransaksiKeluar>();
+      localList.forEach((t) => { if (t?.no_dokumen) localMap.set(t.no_dokumen, t); });
 
-      const merged = urutkanTransaksi(Array.from(mergedMap.values()));
+      const merged = urutkanTransaksi(
+        parsed.map((remoteT) => {
+          const localT = localMap.get(remoteT.no_dokumen);
+          if (localT && (!remoteT.items || remoteT.items.length === 0 || !remoteT.items[0]?.barang)) {
+            return { ...remoteT, items: localT.items };
+          }
+          return remoteT;
+        })
+      );
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify(merged));
@@ -368,28 +376,20 @@ export async function fetchAndSyncTransaksiMasuk(barangList: Barang[]): Promise<
       const localStr = typeof window !== 'undefined' ? localStorage.getItem('sipersedia_transaksi_masuk') : null;
       const localList: TransaksiMasuk[] = localStr ? JSON.parse(localStr) : [];
 
-      const mergedMap = new Map<string, TransaksiMasuk>();
-      // 1. Simpan semua riwayat lokal
-      localList.forEach((t) => {
-        if (t && t.no_dokumen) mergedMap.set(t.no_dokumen, t);
-      });
-      // 2. Gabungkan dengan data remote tanpa menghapus metadata item lokal
-      parsed.forEach((t) => {
-        if (!t || !t.no_dokumen) return;
-        const existing = mergedMap.get(t.no_dokumen);
-        if (existing) {
-          // Bila di lokal sudah ada item detail yang lengkap, pertahankan
-          mergedMap.set(t.no_dokumen, {
-            ...existing,
-            ...t,
-            items: (t.items && t.items.length > 0 && t.items[0]?.barang) ? t.items : existing.items,
-          });
-        } else {
-          mergedMap.set(t.no_dokumen, t);
-        }
-      });
+      // Cloud adalah sumber kebenaran:
+      // Hanya dokumen yang ada di remote (cloud) yang dipertahankan.
+      const localMap = new Map<string, TransaksiMasuk>();
+      localList.forEach((t) => { if (t?.no_dokumen) localMap.set(t.no_dokumen, t); });
 
-      const merged = urutkanTransaksi(Array.from(mergedMap.values()));
+      const merged = urutkanTransaksi(
+        parsed.map((remoteT) => {
+          const localT = localMap.get(remoteT.no_dokumen);
+          if (localT && (!remoteT.items || remoteT.items.length === 0 || !remoteT.items[0]?.barang)) {
+            return { ...remoteT, items: localT.items };
+          }
+          return remoteT;
+        })
+      );
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('sipersedia_transaksi_masuk', JSON.stringify(merged));
