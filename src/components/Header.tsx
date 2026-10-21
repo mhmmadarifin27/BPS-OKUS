@@ -65,7 +65,7 @@ export default function Header({
         setEditForm({
           name: u.name || userName,
           nip: u.nip || (u.role === 'admin' ? '199003142010011001' : '199505122018011001'),
-          email: u.email || (u.role === 'admin' ? 'arifinkembar2@gmail.com' : 'okusbps@gmail.com'),
+          email: u.email || (u.role === 'admin' ? 'guspitak-pppk@bps.go.id' : 'bps1608@bps.go.id'),
           bidang: resolvedBidang,
           avatar_url: u.avatar_url || null,
         });
@@ -441,7 +441,7 @@ export default function Header({
                   value={editForm.email}
                   onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                   className="input text-xs"
-                  placeholder="email@bps-okus.go.id"
+                  placeholder="email@bps.go.id"
                 />
               </div>
 

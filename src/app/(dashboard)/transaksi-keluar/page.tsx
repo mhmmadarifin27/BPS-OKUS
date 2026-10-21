@@ -238,6 +238,15 @@ export default function TransaksiKeluarPage() {
 
   // Handler Persetujuan (Approval) khusus Admin Gudang
   const handleApprove = async (trx: TransaksiKeluar) => {
+    // Blokir polling overwrite selama update cloud berjalan
+    (window as any).__stockUpdating = true;
+
+    // Urutan penting: 1) saatkan status approved tersimpan di cloud DULU,
+    // agar perhitungan titik awal (baseline) stok di server memperhitungkan
+    // barang keluar ini; 2) baru tulis stok hasil pengurangan.
+    const updatedTrx: TransaksiKeluar = { ...trx, status: 'approved' };
+    await pushTransaksiKeluar(updatedTrx);
+
     // Kurangi stok master barang sesuai barang keluar
     let nextBarang = [...barangList];
     const stockUpdates: Promise<boolean>[] = [];
@@ -255,17 +264,13 @@ export default function TransaksiKeluarPage() {
     setBarangList(nextBarang);
     localStorage.setItem('sipersedia_barang_list', JSON.stringify(nextBarang));
 
-    // Blokir polling overwrite selama update stok berjalan
-    (window as any).__stockUpdating = true;
     // Tunggu semua PUT stok ke cloud selesai dulu
     await Promise.all(stockUpdates);
     (window as any).__stockUpdating = false;
 
-    const updatedTrx: TransaksiKeluar = { ...trx, status: 'approved' };
     const updatedList = transaksiList.map(t => t.id === trx.id ? updatedTrx : t);
     setTransaksiList(updatedList);
     localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify(updatedList));
-    pushTransaksiKeluar(updatedTrx);
 
     if (typeof window !== 'undefined') {
       Object.keys(localStorage).forEach(k => {

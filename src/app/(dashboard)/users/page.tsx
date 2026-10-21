@@ -62,7 +62,7 @@ export default function UsersPage() {
               cleaned[adminIdx] = {
                 ...cleaned[adminIdx],
                 name: 'Admin Persediaan',
-                email: 'arifinkembar2@gmail.com',
+                email: 'guspitak-pppk@bps.go.id',
                 nip: cleaned[adminIdx].nip || '199003142010011001',
               };
             }
@@ -71,7 +71,7 @@ export default function UsersPage() {
               cleaned[userIdx] = {
                 ...cleaned[userIdx],
                 name: 'Pegawai BPS OKU Selatan',
-                email: 'okusbps@gmail.com',
+                email: 'bps1608@bps.go.id',
                 bidang: '',
                 nip: cleaned[userIdx].nip || '199505122018011001',
               };
@@ -278,8 +278,10 @@ export default function UsersPage() {
     if (resetCandidate.email) {
       const em = resetCandidate.email.toLowerCase();
       passObj[em] = newPassword;
-      if (em === 'okusbps@gmail.com') passObj['okusbps'] = newPassword;
-      if (em === 'arifinkembar2@gmail.com') passObj['arifinkembar2'] = newPassword;
+      if (em === 'bps1608@bps.go.id') passObj['bps1608'] = newPassword;
+      if (em === 'bps1608@bps.go.id') passObj['pegawai'] = newPassword;
+      if (em === 'guspitak-pppk@bps.go.id') passObj['guspitak-pppk'] = newPassword;
+      if (em === 'guspitak-pppk@bps.go.id') passObj['admin'] = newPassword;
     }
     localStorage.setItem('sipersedia_passwords', JSON.stringify(passObj));
 
@@ -717,7 +719,7 @@ export default function UsersPage() {
                     type="email"
                     required
                     className="input text-xs"
-                    placeholder="nama@bps-okus.go.id"
+                    placeholder="nama@bps.go.id"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   />

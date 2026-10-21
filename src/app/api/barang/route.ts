@@ -1,6 +1,96 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 
+// ==========================================================
+// API Barang
+// - Stok barang dengan riwayat transaksi dihitung dari formula:
+//     stok = stok_baseline + (total masuk - total keluar approved)
+//   "stok_baseline" adalah titik awal yang diperbarui setiap kali
+//   stok diedit manual di aplikasi — sehingga penyesuaian manual
+//   TIDAK dikembalikan (revert) oleh perhitungan ulang.
+// - Bila kolom stok_baseline belum ada di database (migrasi belum
+//   dijalankan), baseline disimpan sementara di tabel laporan_bulanan
+//   (bulan 12, tahun 0) sebagai penampung sementara.
+// ==========================================================
+
+// Baris penanda baseline sementara memakai (bulan 12, tahun 0) karena kolom bulan
+// memiliki CHECK (1..12) di database — dan tak ada laporan asli untuk tahun 0.
+const FALLBACK_BULAN = 12;
+const FALLBACK_TAHUN = 0;
+
+type MutasiRow = { id_barang?: number; jumlah?: number; status?: string; keterangan?: string | null };
+
+/** Uraikan satu baris transaksi menjadi daftar (barang, jumlah) — mendukung dokumen multi-item. */
+function uraiJumlahBarang(row: any): Array<{ barangId: number | null; jumlah: number }> {
+  let items: any[] = [];
+  if (row.keterangan && typeof row.keterangan === 'string' && row.keterangan.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(row.keterangan);
+      if (Array.isArray(parsed.items) && parsed.items.length > 0) items = parsed.items;
+    } catch {}
+  }
+  if (items.length === 0) {
+    return [{ barangId: row.id_barang ?? null, jumlah: Number(row.jumlah) || 0 }];
+  }
+  return items
+    .map((it) => ({ barangId: it.id_barang || it.barang?.id || null, jumlah: Number(it.jumlah) || 0 }));
+}
+
+async function hitungNetBarang(supabase: any, barangId: number): Promise<number> {
+  const [masukRes, keluarRes] = await Promise.all([
+    supabase.from('transaksi_masuk').select('id_barang, jumlah, keterangan'),
+    supabase.from('transaksi_keluar').select('id_barang, jumlah, status, keterangan'),
+  ]);
+  let net = 0;
+  for (const t of masukRes.data || []) {
+    for (const it of uraiJumlahBarang(t)) {
+      if (it.barangId === barangId) net += it.jumlah;
+    }
+  }
+  for (const t of keluarRes.data || []) {
+    if (t.status === 'rejected' || t.status === 'pending') continue;
+    for (const it of uraiJumlahBarang(t)) {
+      if (it.barangId === barangId) net -= it.jumlah;
+    }
+  }
+  return net;
+}
+
+/** Ambil peta baseline cadangan dari laporan_bulanan (bulan 12, tahun 0 — bukan laporan asli). */
+async function getBaselineFallback(supabase: any): Promise<Record<string, number>> {
+  try {
+    const { data } = await supabase
+      .from('laporan_bulanan')
+      .select('data_rekapitulasi')
+      .eq('bulan', FALLBACK_BULAN)
+      .eq('tahun', FALLBACK_TAHUN)
+      .maybeSingle();
+    const map = data?.data_rekapitulasi?.stok_baseline;
+    return map && typeof map === 'object' ? map : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Simpan baseline cadangan (kolom stok_baseline belum ada). */
+async function setBaselineFallback(supabase: any, barangId: number, baseline: number): Promise<void> {
+  let payload: any = { stok_baseline: { [String(barangId)]: baseline } };
+  try {
+    const existing = await getBaselineFallback(supabase);
+    payload = { stok_baseline: { ...existing, [String(barangId)]: baseline } };
+  } catch {}
+  try {
+    await supabase
+      .from('laporan_bulanan')
+      .upsert(
+        { bulan: FALLBACK_BULAN, tahun: FALLBACK_TAHUN, data_rekapitulasi: payload },
+        { onConflict: 'bulan,tahun' }
+      );
+  } catch (e) {
+    console.warn('[API Barang] Gagal menyimpan baseline fallback:', e);
+  }
+}
+
 export async function GET() {
   try {
     const supabase = getServiceSupabase();
@@ -17,55 +107,43 @@ export async function GET() {
       return NextResponse.json({ data: [] });
     }
 
-    // Ambil mutasi masuk dan keluar untuk menjamin konsistensi stok dengan buku ledger laporan
-    const [masukRes, keluarRes] = await Promise.all([
+    const [masukRes, keluarRes, baselineFallback] = await Promise.all([
       supabase.from('transaksi_masuk').select('id_barang, jumlah, keterangan'),
       supabase.from('transaksi_keluar').select('id_barang, jumlah, status, keterangan'),
+      getBaselineFallback(supabase),
     ]);
 
     const inMap: Record<number, number> = {};
     const outMap: Record<number, number> = {};
-
-    (masukRes.data || []).forEach((t: any) => {
-      let items: any[] = [];
-      if (t.keterangan && typeof t.keterangan === 'string' && t.keterangan.startsWith('{')) {
-        try {
-          const parsed = JSON.parse(t.keterangan);
-          if (Array.isArray(parsed.items) && parsed.items.length > 0) items = parsed.items;
-        } catch {}
+    (masukRes.data || []).forEach((t: MutasiRow) => {
+      for (const it of uraiJumlahBarang(t)) {
+        if (it.barangId == null) continue;
+        const bId = it.barangId as number;
+        inMap[bId] = (inMap[bId] || 0) + it.jumlah;
       }
-      if (items.length === 0) items = [{ id_barang: t.id_barang, jumlah: t.jumlah }];
-      items.forEach((it) => {
-        const bId = it.id_barang || it.barang?.id;
-        if (bId) inMap[bId] = (inMap[bId] || 0) + (Number(it.jumlah) || 0);
-      });
     });
-
-    (keluarRes.data || []).forEach((t: any) => {
+    (keluarRes.data || []).forEach((t: MutasiRow) => {
       if (t.status === 'rejected' || t.status === 'pending') return;
-      let items: any[] = [];
-      if (t.keterangan && typeof t.keterangan === 'string' && t.keterangan.startsWith('{')) {
-        try {
-          const parsed = JSON.parse(t.keterangan);
-          if (Array.isArray(parsed.items) && parsed.items.length > 0) items = parsed.items;
-        } catch {}
+      for (const it of uraiJumlahBarang(t)) {
+        if (it.barangId == null) continue;
+        const bId = it.barangId as number;
+        outMap[bId] = (outMap[bId] || 0) + it.jumlah;
       }
-      if (items.length === 0) items = [{ id_barang: t.id_barang, jumlah: t.jumlah }];
-      items.forEach((it) => {
-        const bId = it.id_barang || it.barang?.id;
-        if (bId) outMap[bId] = (outMap[bId] || 0) + (Number(it.jumlah) || 0);
-      });
     });
 
-    // Reconcile stok: jika barang memiliki mutasi masuk, hitung dari mutasi (masuk - keluar approved)
-    const correctedData = barangs.map((b) => {
+    // Konsistensi stok: barang yang PUNYA riwayat transaksi dihitung dari
+    // baseline + (masuk - keluar). Barang tanpa riwayat memakai stok tersimpan.
+    const correctedData = barangs.map((b: any) => {
       const totalIn = inMap[b.id];
       const totalOut = outMap[b.id] || 0;
       if (totalIn !== undefined) {
-        // ponytail: Jika barang punya riwayat transaksi masuk, stok = masuk - keluar approved. Upgrade path: snapshot bulanan
-        const computedStock = Math.max(0, totalIn - totalOut);
+        const baseline =
+          typeof b.stok_baseline === 'number'
+            ? b.stok_baseline
+            : (baselineFallback[String(b.id)] ?? 0);
+        const computedStock = Math.max(0, baseline + totalIn - totalOut);
         if (computedStock !== b.stok) {
-          // Sinkronkan data di database secara background jika terjadi selisih
+          // Sinkronkan data di database secara background bila selisih
           supabase.from('barang').update({ stok: computedStock }).eq('id', b.id).then();
         }
         return { ...b, stok: computedStock };
@@ -84,27 +162,90 @@ export async function POST(req: Request) {
     const body = await req.json();
     const supabase = getServiceSupabase();
 
+    // Barang sudah ada? (carilah dulu berdasarkan id lalu kode_barang)
+    let existing: any = null;
+    if (body.id && typeof body.id === 'number') {
+      const { data } = await supabase
+        .from('barang')
+        .select('id, stok, stok_baseline')
+        .eq('id', body.id)
+        .maybeSingle();
+      existing = data;
+    }
+    if (!existing && body.kode_barang && body.kode_barang !== '-') {
+      const { data } = await supabase
+        .from('barang')
+        .select('id, stok, stok_baseline')
+        .eq('kode_barang', body.kode_barang)
+        .maybeSingle();
+      existing = data;
+    }
+
+    if (existing) {
+      // EDIT barang lewat POST = perbarui bidang master saja; stok & baseline
+      // tetap, karena penyesuaian stok wajib lewat PUT agar baseline hitungannya rapi.
+      const masterUpdate: any = {
+        updated_at: new Date().toISOString(),
+      };
+      if (body.nama_barang) masterUpdate.nama_barang = body.nama_barang;
+      if (body.kode_barang && body.kode_barang !== '-') masterUpdate.kode_barang = body.kode_barang;
+      const idKategori =
+        typeof body.id_kategori === 'number'
+          ? body.id_kategori
+          : (typeof body.kategori?.id === 'number' ? body.kategori.id : undefined);
+      if (idKategori !== undefined) masterUpdate.id_kategori = idKategori;
+      const idSatuan =
+        typeof body.id_satuan === 'number'
+          ? body.id_satuan
+          : (typeof body.satuan?.id === 'number' ? body.satuan.id : undefined);
+      if (idSatuan !== undefined) masterUpdate.id_satuan = idSatuan;
+      const idLokasi =
+        typeof body.id_lokasi === 'number'
+          ? body.id_lokasi
+          : (typeof body.lokasi?.id === 'number' ? body.lokasi.id : undefined);
+      if (idLokasi !== undefined) masterUpdate.id_lokasi = idLokasi;
+      if (typeof body.stok_minimum === 'number') masterUpdate.stok_minimum = body.stok_minimum;
+      if (body.deskripsi !== undefined) masterUpdate.deskripsi = body.deskripsi;
+      if (body.foto_url !== undefined) masterUpdate.foto_url = body.foto_url;
+
+      if (Object.keys(masterUpdate).length > 1) {
+        const { data, error } = await supabase
+          .from('barang')
+          .update(masterUpdate)
+          .eq('id', existing.id)
+          .select();
+        if (error) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        return NextResponse.json({ success: true, data });
+      }
+      return NextResponse.json({ success: true, data: [existing] });
+    }
+
+    // BARANG BARU: stok awal = titik awal (baseline) ledger
+    const stokAwal = Number(body.stok) || 0;
     const payload: any = {
       kode_barang: body.kode_barang,
       nama_barang: body.nama_barang,
       id_kategori: body.id_kategori || null,
       id_satuan: body.id_satuan || null,
       id_lokasi: body.id_lokasi || null,
-      stok: typeof body.stok === 'number' ? body.stok : 0,
+      stok: stokAwal,
       stok_minimum: typeof body.stok_minimum === 'number' ? body.stok_minimum : 5,
       foto_url: body.foto_url || null,
       deskripsi: body.deskripsi || null,
       updated_at: new Date().toISOString(),
     };
+    if (body.id && typeof body.id === 'number') payload.id = body.id;
+    payload.stok_baseline = stokAwal;
 
-    if (body.id && typeof body.id === 'number') {
-      payload.id = body.id;
+    let { data, error } = await supabase.from('barang').upsert(payload, { onConflict: 'kode_barang' }).select();
+
+    // Kolom stok_baseline belum ada (migrasi belum jalan) → coba tanpa kolom itu
+    if (error && String(error.message || '').toLowerCase().includes('stok_baseline')) {
+      delete payload.stok_baseline;
+      ({ data, error } = await supabase.from('barang').upsert(payload, { onConflict: 'kode_barang' }).select());
     }
-
-    const { data, error } = await supabase
-      .from('barang')
-      .upsert(payload, { onConflict: 'kode_barang' })
-      .select();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
@@ -128,18 +269,36 @@ export async function PUT(req: Request) {
     const updateData: any = {
       updated_at: new Date().toISOString(),
     };
-    if (typeof body.stok === 'number') updateData.stok = body.stok;
     if (body.nama_barang) updateData.nama_barang = body.nama_barang;
+    if (body.kode_barang && body.kode_barang !== '-') updateData.kode_barang = body.kode_barang;
     if (typeof body.stok_minimum === 'number') updateData.stok_minimum = body.stok_minimum;
     if (body.deskripsi !== undefined) updateData.deskripsi = body.deskripsi;
+    if (typeof body.id_kategori === 'number') updateData.id_kategori = body.id_kategori;
+    if (typeof body.id_satuan === 'number') updateData.id_satuan = body.id_satuan;
+    if (typeof body.id_lokasi === 'number') updateData.id_lokasi = body.id_lokasi;
+    if (body.foto_url !== undefined) updateData.foto_url = body.foto_url;
 
-    const { data, error } = await supabase
-      .from('barang')
-      .update(updateData)
-      .eq('id', body.id)
-      .select();
+    const net = await hitungNetBarang(supabase, body.id);
+
+    if (typeof body.stok === 'number') {
+      const stokBaru = Math.max(0, body.stok);
+      updateData.stok = stokBaru;
+      // Penyesuaian manual = titik awal baru: stok = baseline + (masuk - keluar)
+      const baselineBaru = Math.max(0, stokBaru - net);
+      updateData.stok_baseline = baselineBaru;
+    }
+
+    let { data, error } = await supabase.from('barang').update(updateData).eq('id', body.id).select();
+
+    // Fallback bila kolom stok_baseline belum dijalankan migrasinya
+    if (error && updateData.stok_baseline !== undefined && String(error.message || '').toLowerCase().includes('stok_baseline')) {
+      await setBaselineFallback(supabase, body.id, updateData.stok_baseline);
+      delete updateData.stok_baseline;
+      ({ data, error } = await supabase.from('barang').update(updateData).eq('id', body.id).select());
+    }
 
     if (error) {
+      console.error('[API Barang PUT Error]:', error);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 

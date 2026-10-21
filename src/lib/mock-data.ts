@@ -10,7 +10,7 @@ export const mockCurrentUser: User = {
   id: 'admin-001',
   name: 'Admin Persediaan',
   nip: '199003142010011001',
-  email: 'arifinkembar2@gmail.com',
+  email: 'guspitak-pppk@bps.go.id',
   role: 'admin',
   bidang: 'Subbagian Umum',
   avatar_url: null,
@@ -20,7 +20,7 @@ export const mockCurrentUser: User = {
 
 export const mockUsers: User[] = [
   mockCurrentUser,
-  { id: 'usr-000', name: 'Pegawai BPS OKU Selatan', nip: '199505122018011001', email: 'okusbps@gmail.com', role: 'user', bidang: '', avatar_url: null, is_active: true, created_at: '2026-01-01' },
+  { id: 'usr-000', name: 'Pegawai BPS OKU Selatan', nip: '199505122018011001', email: 'bps1608@bps.go.id', role: 'user', bidang: '', avatar_url: null, is_active: true, created_at: '2026-01-01' },
 ];
 
 export const SAMPLE_BARANG_BPS: Barang[] = [

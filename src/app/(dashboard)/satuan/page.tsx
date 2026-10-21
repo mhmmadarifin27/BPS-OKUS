@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Ruler, Plus, Edit2, Trash2, X, AlertTriangle, CheckCircle2, Search } from 'lucide-react';
+import { pushMasterItem, deleteMasterItem, fetchAndSyncMaster } from '@/lib/master-sync';
 
 interface SatuanItem {
   id: number;
@@ -53,6 +54,11 @@ export default function SatuanPage() {
     }
     // Initialize storage if empty
     localStorage.setItem('sipersedia_satuan_list', JSON.stringify(initialSatuan));
+
+    // Tarik terbaru dari cloud (mengantre pulih bila halaman terbuka sebelum sinkronisasi layout selesai)
+    fetchAndSyncMaster('satuan').then((rows) => {
+      if (Array.isArray(rows) && rows.length > 0) setSatuanList(rows);
+    });
   }, []);
 
   const showNotification = (message: string, type: 'success' | 'info' = 'success') => {
@@ -72,7 +78,7 @@ export default function SatuanPage() {
     setShowModal(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNama.trim()) {
       alert('Nama satuan tidak boleh kosong');
@@ -84,6 +90,14 @@ export default function SatuanPage() {
       updatedList = satuanList.map((s) =>
         s.id === editItem.id ? { ...s, nama: formNama.trim() } : s
       );
+      const changedItem = updatedList.find((s) => s.id === editItem.id);
+      if (changedItem) {
+        if (changedItem.nama !== editItem.nama) {
+          // Nama diganti: singkirkan nama lama di cloud dulu agar tidak dobel
+          await deleteMasterItem('satuan', { nama: editItem.nama });
+        }
+        pushMasterItem('satuan', changedItem);
+      }
       showNotification(`Satuan "${formNama.trim()}" berhasil diperbarui!`, 'success');
     } else {
       const newItem: SatuanItem = {
@@ -91,6 +105,8 @@ export default function SatuanPage() {
         nama: formNama.trim(),
       };
       updatedList = [...satuanList, newItem];
+      // Sinkronkan ke Supabase agar terlihat di seluruh perangkat
+      pushMasterItem('satuan', newItem);
       showNotification(`Satuan "${formNama.trim()}" berhasil ditambahkan!`, 'success');
     }
 
@@ -105,6 +121,8 @@ export default function SatuanPage() {
     const updated = satuanList.filter((s) => s.id !== deleteCandidate.id);
     setSatuanList(updated);
     localStorage.setItem('sipersedia_satuan_list', JSON.stringify(updated));
+    // Sinkronkan penghapusan ke Supabase
+    deleteMasterItem('satuan', { nama: targetName });
     setDeleteCandidate(null);
     showNotification(`Satuan "${targetName}" berhasil dihapus.`, 'info');
   };

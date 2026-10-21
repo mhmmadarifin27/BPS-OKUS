@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Tags, Plus, Edit2, Trash2, X, AlertTriangle, CheckCircle2, Search } from 'lucide-react';
+import { pushMasterItem, deleteMasterItem, fetchAndSyncMaster } from '@/lib/master-sync';
 
 interface KategoriItem {
   id: number;
@@ -44,6 +45,11 @@ export default function KategoriPage() {
       }
     }
 
+    // Tarik terbaru dari cloud (mengatasi race saat halaman terbuka lebih dulu dari sinkronisasi layout)
+    fetchAndSyncMaster('kategori').then((rows) => {
+      if (Array.isArray(rows) && rows.length > 0) setKategoriList(rows);
+    });
+
     const storedKat = localStorage.getItem('sipersedia_kategori_list');
     if (storedKat) {
       try {
@@ -79,7 +85,7 @@ export default function KategoriPage() {
     setShowModal(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNama.trim()) {
       alert('Nama kategori tidak boleh kosong');
@@ -93,6 +99,14 @@ export default function KategoriPage() {
           ? { ...k, nama: formNama.trim(), deskripsi: formDeskripsi.trim() }
           : k
       );
+      const changedItem = updatedList.find((k) => k.id === editItem.id);
+      if (changedItem) {
+        if (changedItem.nama !== editItem.nama) {
+          // Nama diganti: singkirkan nama lama di cloud dulu agar tidak dobel
+          await deleteMasterItem('kategori', { nama: editItem.nama });
+        }
+        pushMasterItem('kategori', changedItem);
+      }
       showNotification(`Kategori "${formNama.trim()}" berhasil diperbarui!`, 'success');
     } else {
       const newItem: KategoriItem = {
@@ -102,6 +116,8 @@ export default function KategoriPage() {
         jumlah_barang: 0,
       };
       updatedList = [newItem, ...kategoriList];
+      // Sinkronkan ke Supabase agar terlihat di seluruh perangkat
+      pushMasterItem('kategori', newItem);
       showNotification(`Kategori "${formNama.trim()}" berhasil ditambahkan!`, 'success');
     }
 
@@ -116,6 +132,8 @@ export default function KategoriPage() {
     const updated = kategoriList.filter((k) => k.id !== deleteCandidate.id);
     setKategoriList(updated);
     localStorage.setItem('sipersedia_kategori_list', JSON.stringify(updated));
+    // Sinkronkan penghapusan ke Supabase
+    deleteMasterItem('kategori', { nama: targetName });
     setDeleteCandidate(null);
     showNotification(`Kategori "${targetName}" berhasil dihapus.`, 'info');
   };

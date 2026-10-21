@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import { TIM_PEMOHON_LIST, PEJABAT_KPB, PENGELOLA_PERSEDIAAN, getStoredTimList, saveStoredTimList, formatNamaPJ, TimPemohon } from '@/types';
 import { resetToTestingMode, loadSimulationData, wipeAllData } from '@/lib/data-management';
+import { pushMasterItems } from '@/lib/master-sync';
 import { supabase } from '@/lib/supabase';
 
 interface UserProfile {
@@ -31,7 +32,7 @@ function PengaturanContent() {
     id: 'admin-001',
     name: 'Admin Persediaan',
     nip: '199003142010011001',
-    email: 'arifinkembar2@gmail.com',
+    email: 'guspitak-pppk@bps.go.id',
     role: 'admin',
     bidang: 'Subbagian Umum',
     avatar_url: null,
@@ -88,7 +89,7 @@ function PengaturanContent() {
             id: u.id || (u.role === 'admin' ? 'admin-001' : 'usr-000'),
             name: u.name || (u.role === 'admin' ? 'Admin Persediaan' : 'Pegawai BPS OKU Selatan'),
             nip: u.nip || (u.role === 'admin' ? '199003142010011001' : '199505122018011001'),
-            email: u.email || (u.role === 'admin' ? 'arifinkembar2@gmail.com' : 'okusbps@gmail.com'),
+            email: u.email || (u.role === 'admin' ? 'guspitak-pppk@bps.go.id' : 'bps1608@bps.go.id'),
             role: u.role || 'admin',
             bidang: (u.bidang === 'Tim Statistik Sosial' || (!u.bidang && u.role !== 'admin')) ? '' : (u.bidang || (u.role === 'admin' ? 'Subbagian Umum' : '')),
             avatar_url: u.avatar_url || null,
@@ -162,6 +163,8 @@ function PengaturanContent() {
 
     setTimList(updated);
     saveStoredTimList(updated);
+    // Sinkronkan daftar tim ke Supabase (tabel tim_pemohon) agar sama di semua perangkat
+    pushMasterItems('tim', updated);
     setEditingTim(null);
     setNotification({
       type: 'success',
@@ -262,8 +265,10 @@ function PengaturanContent() {
         const stored = localStorage.getItem('sipersedia_passwords');
         const passMap = stored ? JSON.parse(stored) : {};
         passMap[currentEmail] = passwordForm.newPassword;
-        if (currentEmail === 'okusbps@gmail.com') passMap['okusbps'] = passwordForm.newPassword;
-        if (currentEmail === 'arifinkembar2@gmail.com') passMap['arifinkembar2'] = passwordForm.newPassword;
+        if (currentEmail === 'bps1608@bps.go.id') passMap['bps1608'] = passwordForm.newPassword;
+        if (currentEmail === 'bps1608@bps.go.id') passMap['pegawai'] = passwordForm.newPassword;
+        if (currentEmail === 'guspitak-pppk@bps.go.id') passMap['guspitak-pppk'] = passwordForm.newPassword;
+        if (currentEmail === 'guspitak-pppk@bps.go.id') passMap['admin'] = passwordForm.newPassword;
         localStorage.setItem('sipersedia_passwords', JSON.stringify(passMap));
       }
 
@@ -512,7 +517,7 @@ function PengaturanContent() {
                       className="input text-sm"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="nama@bps-okus.go.id"
+                      placeholder="nama@bps.go.id"
                     />
                   </div>
                   <div>

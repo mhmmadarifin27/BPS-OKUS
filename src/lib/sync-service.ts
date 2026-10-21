@@ -101,6 +101,36 @@ export async function pushBarang(b: Barang): Promise<boolean> {
   }
 }
 
+/**
+ * Update Lengkap satu barang di cloud lewat PUT (termasuk stok).
+ * PUT memanggil ulang perhitungan "titik awal" (stok_baseline) sehingga
+ * penyesuaian stok manual TIDAK dikembalikan oleh perhitungan ulang ledger.
+ */
+export async function updateBarangFullRemote(b: Barang): Promise<boolean> {
+  try {
+    const res = await fetch('/api/barang', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: b.id,
+        nama_barang: b.nama_barang,
+        kode_barang: b.kode_barang,
+        stok: typeof b.stok === 'number' ? b.stok : undefined,
+        stok_minimum: typeof b.stok_minimum === 'number' ? b.stok_minimum : undefined,
+        id_kategori: b.id_kategori,
+        id_satuan: b.id_satuan,
+        id_lokasi: b.id_lokasi,
+        foto_url: b.foto_url ?? null,
+        deskripsi: b.deskripsi ?? null,
+      }),
+    });
+    return res.ok;
+  } catch (e) {
+    console.warn('[Sync] Gagal memperbarui detail barang di cloud:', e);
+    return false;
+  }
+}
+
 export async function updateBarangStockRemote(id: number, newStock: number): Promise<boolean> {
   try {
     const res = await fetch('/api/barang', {

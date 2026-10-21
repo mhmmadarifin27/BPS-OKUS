@@ -16,6 +16,7 @@ import {
   pushBarang,
   deleteBarangRemote,
   updateBarangStockRemote,
+  updateBarangFullRemote,
   pushTransaksiKeluar,
 } from '@/lib/sync-service';
 
@@ -265,6 +266,11 @@ export default function BarangPage() {
     // Kode barang dibuat opsional sesuai revisi mentor
     const finalKode = formKodeBarang.trim() || '-';
 
+    // Petakan nama kategori/satuan/lokasi terpilih ke id agar konsisten dengan cloud
+    const finalKategoriId = kategoriOptions.findIndex(k => k === formKategori) + 1 || 1;
+    const finalSatuanId = satuanOptions.findIndex(s => s === formSatuan) + 1 || 1;
+    const finalLokasiId = lokasiOptions.findIndex(l => l === formLokasi) + 1 || 1;
+
     let updatedList: Barang[];
     if (editItem) {
       let targetObj: Barang | undefined;
@@ -274,23 +280,26 @@ export default function BarangPage() {
             ...b,
             nama_barang: formNamaBarang.trim(),
             kode_barang: finalKode,
+            id_kategori: finalKategoriId,
+            id_satuan: finalSatuanId,
+            id_lokasi: finalLokasiId,
             stok: Math.max(0, Number(formStok)),
             stok_minimum: Math.max(0, Number(formStokMinimum)),
             deskripsi: formDeskripsi.trim() || null,
             updated_at: new Date().toISOString().split('T')[0],
             kategori: {
-              id: b.kategori?.id || 1,
+              id: finalKategoriId,
               nama_kategori: formKategori,
               deskripsi: null,
               created_at: '',
             },
             satuan: {
-              id: b.satuan?.id || 1,
+              id: finalSatuanId,
               nama_satuan: formSatuan,
               created_at: '',
             },
             lokasi: {
-              id: b.lokasi?.id || 1,
+              id: finalLokasiId,
               nama_lokasi: formLokasi,
               deskripsi: null,
               created_at: '',
@@ -302,7 +311,8 @@ export default function BarangPage() {
         return b;
       });
       if (targetObj) {
-        pushBarang(targetObj);
+        // UPDATE penuh lewat PUT — perhitungan baseline stok di server ikut diperbarui
+        updateBarangFullRemote(targetObj);
       }
       setNotification({
         type: 'success',
@@ -313,9 +323,9 @@ export default function BarangPage() {
         id: Date.now(),
         kode_barang: finalKode,
         nama_barang: formNamaBarang.trim(),
-        id_kategori: 1,
-        id_satuan: 1,
-        id_lokasi: 1,
+        id_kategori: finalKategoriId,
+        id_satuan: finalSatuanId,
+        id_lokasi: finalLokasiId,
         stok: Math.max(0, Number(formStok)),
         stok_minimum: Math.max(0, Number(formStokMinimum)),
         foto_url: null,
@@ -323,18 +333,18 @@ export default function BarangPage() {
         created_at: new Date().toISOString().split('T')[0],
         updated_at: new Date().toISOString().split('T')[0],
         kategori: {
-          id: 1,
+          id: finalKategoriId,
           nama_kategori: formKategori,
           deskripsi: null,
           created_at: '',
         },
         satuan: {
-          id: 1,
+          id: finalSatuanId,
           nama_satuan: formSatuan,
           created_at: '',
         },
         lokasi: {
-          id: 1,
+          id: finalLokasiId,
           nama_lokasi: formLokasi,
           deskripsi: null,
           created_at: '',

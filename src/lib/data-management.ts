@@ -6,19 +6,60 @@
 import { ALL_81_BARANG_BPS, SAMPLE_TRANSAKSI_MASUK, SAMPLE_TRANSAKSI_KELUAR, mockUsers } from './mock-data';
 import { TIM_PEMOHON_LIST, formatNamaPJ } from '@/types';
 
-export const DATA_STORE_VERSION = 'v20261012_lean_6_clean';
+export const DATA_STORE_VERSION = 'v20261021_kredensial_bps_final';
 
 /**
  * Inisialisasi otomatis pada awal aplikasi dimuat.
- * Jika versi data belum sesuai, otomatis reset ke mode uji coba bersih (6 master barang perwakilan, 0 transaksi).
+ * Jika versi data belum sesuai (reset), seluruh cache data uji coba lama di browser
+ * dikosongkan agar pengujian ulang (input pegawai, barang masuk, barang keluar, dll)
+ * dimulai dari keadaan 100% bersih, mengikuti data kosong yang sudah direset di Supabase.
  */
 export function initOrMigrateStore(): boolean {
   if (typeof window === 'undefined') return false;
 
   try {
+    const storedVersion = localStorage.getItem('sipersedia_data_version');
+
+    // ===== RESET DATA UJI COBA LAMA (versi berubah) =====
+    if (storedVersion !== DATA_STORE_VERSION) {
+      // Kosongkan master barang & seluruh transaksi
+      localStorage.setItem('sipersedia_barang_list', JSON.stringify([]));
+      localStorage.setItem('sipersedia_transaksi_masuk', JSON.stringify([]));
+      localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify([]));
+
+      // Hapus semua cache laporan kustom
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('sipersedia_laporan_data_')) {
+          localStorage.removeItem(key);
+        }
+      });
+
+      // Password kustom lama hangus (pasangan kredensial baru memakai email & sandi resmi)
+      localStorage.removeItem('sipersedia_passwords');
+
+      // Daftar akun resmi: Admin Persediaan & Pegawai BPS OKU Selatan (email baru)
+      localStorage.setItem('sipersedia_users_list', JSON.stringify(mockUsers));
+
+      // Perbarui email sesi aktif yang masih memakai kredensial lama
+      // (riwayat kredensial: arifinkembar2@adminpersediaan1608 -> guspitak-pppk; okusbps@okus1608 -> bps1608)
+      const activeStored = localStorage.getItem('sipersedia_user');
+      if (activeStored) {
+        try {
+          const parsed = JSON.parse(activeStored);
+          if (parsed.email === 'arifinkembar2@gmail.com' || parsed.email === 'adminpersediaan1608@bps.go.id') {
+            parsed.email = 'guspitak-pppk@bps.go.id';
+          }
+          if (parsed.email === 'okusbps@gmail.com' || parsed.email === 'okus1608@bps.go.id') {
+            parsed.email = 'bps1608@bps.go.id';
+          }
+          localStorage.setItem('sipersedia_user', JSON.stringify(parsed));
+        } catch {}
+      }
+    }
+
     const existingBarang = localStorage.getItem('sipersedia_barang_list');
     if (!existingBarang) {
-      localStorage.setItem('sipersedia_barang_list', JSON.stringify(ALL_81_BARANG_BPS));
+      localStorage.setItem('sipersedia_barang_list', JSON.stringify([]));
     }
 
     const existingMasuk = localStorage.getItem('sipersedia_transaksi_masuk');
@@ -94,7 +135,7 @@ export function initOrMigrateStore(): boolean {
             cleanedUsers[adminIdx] = {
               ...cleanedUsers[adminIdx],
               name: 'Admin Persediaan',
-              email: 'arifinkembar2@gmail.com',
+              email: 'guspitak-pppk@bps.go.id',
             };
           }
           const userIdx = cleanedUsers.findIndex((u: any) => u.role === 'user');
@@ -102,7 +143,7 @@ export function initOrMigrateStore(): boolean {
             cleanedUsers[userIdx] = {
               ...cleanedUsers[userIdx],
               name: 'Pegawai BPS OKU Selatan',
-              email: 'okusbps@gmail.com',
+              email: 'bps1608@bps.go.id',
               bidang: '',
             };
           }

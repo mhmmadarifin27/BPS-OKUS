@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Lock, User, Eye, EyeOff, ShieldCheck, ArrowRight, Sparkles, KeyRound, Mail, ArrowLeft, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
 import BpsLogo from '@/components/BpsLogo';
 import { supabase } from '@/lib/supabase';
 
@@ -15,19 +15,12 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Mode Lupa Password
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
-  const [forgotError, setForgotError] = useState<string | null>(null);
-  const [isSendingReset, setIsSendingReset] = useState(false);
-
   const performLogin = (role: 'admin' | 'user', emailCustom?: string, nameCustom?: string) => {
     if (role === 'admin') {
       localStorage.setItem('sipersedia_user', JSON.stringify({
         id: 'admin-001',
         name: nameCustom || 'Admin Persediaan BPS',
-        email: emailCustom || 'arifinkembar2@gmail.com',
+        email: emailCustom || 'guspitak-pppk@bps.go.id',
         role: 'admin',
         bidang: 'Subbagian Umum',
       }));
@@ -35,7 +28,7 @@ export default function LoginPage() {
       localStorage.setItem('sipersedia_user', JSON.stringify({
         id: 'usr-000',
         name: nameCustom || 'Pegawai BPS OKU Selatan',
-        email: emailCustom || 'okusbps@gmail.com',
+        email: emailCustom || 'bps1608@bps.go.id',
         role: 'user',
         bidang: '',
       }));
@@ -51,13 +44,13 @@ export default function LoginPage() {
     const input = usernameOrEmail.trim().toLowerCase();
     const pass = password.trim();
 
-    // Normalisasi email
+    // Normalisasi email (kredensial resmi BPS OKU Selatan)
     const authEmail = input.includes('@')
       ? input
-      : input === 'admin' || input === 'admin_persediaan' || input === 'arifinkembar2'
-      ? 'arifinkembar2@gmail.com'
-      : input === 'okusbps' || input === 'pegawai'
-      ? 'okusbps@gmail.com'
+      : input === 'admin' || input === 'guspitak-pppk' || input === 'guspitak'
+      ? 'guspitak-pppk@bps.go.id'
+      : input === 'pegawai' || input === 'bps1608'
+      ? 'bps1608@bps.go.id'
       : `${input}@gmail.com`;
 
     // Cek apakah akun memiliki password kustom yang pernah diubah/direset
@@ -79,7 +72,7 @@ export default function LoginPage() {
       });
 
       if (authData?.user && !authError) {
-        const uRole = authData.user.user_metadata?.role || (authEmail.includes('admin') || authEmail.includes('arifinkembar') ? 'admin' : 'user');
+        const uRole = authData.user.user_metadata?.role || (authEmail === 'guspitak-pppk@bps.go.id' ? 'admin' : 'user');
         const uName = authData.user.user_metadata?.name || (uRole === 'admin' ? 'Admin Persediaan BPS' : 'Pegawai BPS OKU Selatan');
         performLogin(uRole, authData.user.email, uName);
         return;
@@ -101,25 +94,19 @@ export default function LoginPage() {
 
     // 2. Kredensial Resmi Fallback:
     const isPegawai =
-      authEmail === 'okusbps@gmail.com' ||
-      input === 'okusbps' ||
-      input === 'pegawai@gmail.com' ||
-      input === 'pegawai.bps@gmail.com' ||
-      input === 'pegawai' ||
-      input === 'user' ||
-      input === 'pegawai@bps-okus.go.id';
+      authEmail === 'bps1608@bps.go.id' ||
+      input === 'bps1608' ||
+      input === 'pegawai';
 
     const isAdmin =
-      authEmail === 'arifinkembar2@gmail.com' ||
-      input === 'arifinkembar2' ||
-      input === 'admin_persediaan' ||
-      input === 'admin' ||
-      input === 'admin@gmail.com' ||
-      input === 'admin@bps-okus.go.id';
+      authEmail === 'guspitak-pppk@bps.go.id' ||
+      input === 'guspitak-pppk' ||
+      input === 'guspitak' ||
+      input === 'admin';
 
     // JIKA PASSWORD PERNAH DIUBAH: HANYA TERIMA PASSWORD BARU! Password lama hangus.
     if (isPegawai) {
-      const isPassValid = customPassword ? pass === customPassword : (pass === 'bpsoKUS2312.' || pass === 'pegawai 123');
+      const isPassValid = customPassword ? pass === customPassword : pass === 'bps1608';
       if (isPassValid) {
         performLogin('user', authEmail, 'Pegawai BPS OKU Selatan');
         return;
@@ -127,7 +114,7 @@ export default function LoginPage() {
     }
 
     if (isAdmin) {
-      const isPassValid = customPassword ? pass === customPassword : (pass === 'Indonesia123.' || pass === 'admin123');
+      const isPassValid = customPassword ? pass === customPassword : pass === 'bps1608';
       if (isPassValid) {
         performLogin('admin', authEmail, 'Admin Persediaan BPS');
         return;
@@ -155,41 +142,6 @@ export default function LoginPage() {
 
     setError('Email/Username atau password tidak valid. Silakan periksa kembali.');
     setIsLoading(false);
-  };
-
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setForgotError(null);
-    setForgotSuccess(null);
-    setIsSendingReset(true);
-
-    const email = forgotEmail.trim();
-    if (!email) {
-      setForgotError('Silakan masukkan alamat email akun Anda!');
-      setIsSendingReset(false);
-      return;
-    }
-
-    try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${origin}/reset-password`,
-      });
-
-      if (resetErr) {
-        console.warn('[Supabase Auth Reset]:', resetErr.message);
-      }
-
-      setForgotSuccess(
-        `Tautan konfirmasi ganti kata sandi telah dikirim ke "${email}". Silakan periksa kotak masuk atau folder spam email Anda.`
-      );
-    } catch (err: any) {
-      setForgotSuccess(
-        `Permintaan reset kata sandi untuk "${email}" telah diproses. Anda dapat langsung membuka halaman ganti kata sandi.`
-      );
-    } finally {
-      setIsSendingReset(false);
-    }
   };
 
   return (
@@ -232,9 +184,7 @@ export default function LoginPage() {
           <div className="h-1.5 w-full bg-gradient-to-r from-bps-blue via-bps-orange to-bps-green" />
 
           <div className="p-6 sm:p-8">
-            {!isForgotPassword ? (
-              // ================= TAMPILAN MASUK =================
-              <>
+            <>
                 <div className="text-center mb-6">
                   <h2 className="text-lg font-bold text-dark-800">Masuk ke Sistem</h2>
                   <p className="text-dark-400 text-xs mt-1">
@@ -269,23 +219,9 @@ export default function LoginPage() {
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label htmlFor="password" className="input-label text-xs font-semibold text-dark-700 mb-0">
-                        Kata Sandi
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsForgotPassword(true);
-                          setForgotEmail(usernameOrEmail.includes('@') ? usernameOrEmail : '');
-                          setForgotError(null);
-                          setForgotSuccess(null);
-                        }}
-                        className="text-[11px] font-semibold text-bps-blue hover:text-bps-blue-700 hover:underline"
-                      >
-                        Lupa Password?
-                      </button>
-                    </div>
+                    <label htmlFor="password" className="input-label text-xs font-semibold text-dark-700 mb-1">
+                      Kata Sandi
+                    </label>
                     <div className="relative">
                       <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
                       <input
@@ -326,90 +262,6 @@ export default function LoginPage() {
                   </button>
                 </form>
               </>
-            ) : (
-              // ================= TAMPILAN LUPA PASSWORD =================
-              <div className="animate-fade-in space-y-4">
-                <div className="text-center mb-4">
-                  <div className="w-11 h-11 rounded-2xl bg-bps-blue-50 text-bps-blue flex items-center justify-center mx-auto mb-2.5">
-                    <KeyRound className="w-5 h-5" />
-                  </div>
-                  <h2 className="text-base font-bold text-dark-800">Lupa Kata Sandi?</h2>
-                  <p className="text-dark-400 text-xs mt-1">
-                    Masukkan email terdaftar untuk menerima tautan reset kata sandi via email.
-                  </p>
-                </div>
-
-                {forgotSuccess && (
-                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                      <div className="space-y-1">
-                        <p className="font-semibold">{forgotSuccess}</p>
-                        <p className="text-[11px] text-emerald-700">Silakan buka email Anda, cari pesan dari sistem, lalu klik tautan di dalamnya untuk membuat kata sandi baru.</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {forgotError && (
-                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
-                    <span>{forgotError}</span>
-                  </div>
-                )}
-
-                {!forgotSuccess && (
-                  <form onSubmit={handleForgotPassword} className="space-y-4">
-                    <div>
-                      <label className="input-label text-xs font-semibold text-dark-700">
-                        Email Akun Terdaftar
-                      </label>
-                      <div className="relative">
-                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
-                        <input
-                          type="email"
-                          required
-                          value={forgotEmail}
-                          onChange={(e) => setForgotEmail(e.target.value)}
-                          placeholder="Masukkan email terdaftar"
-                          className="input pl-10 pr-4 py-2.5 text-sm rounded-xl border-dark-200 focus:border-bps-blue"
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isSendingReset}
-                      className="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white bg-bps-blue hover:bg-bps-blue-700 shadow-md transition-all flex items-center justify-center gap-2"
-                    >
-                      {isSendingReset ? (
-                        <span>Mengirim Tautan Email...</span>
-                      ) : (
-                        <>
-                          <span>Kirim Tautan Reset ke Email</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </>
-                      )}
-                    </button>
-                  </form>
-                )}
-
-                <div className="flex items-center justify-start pt-2 border-t border-dark-100 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsForgotPassword(false);
-                      setForgotError(null);
-                      setForgotSuccess(null);
-                    }}
-                    className="font-semibold text-dark-500 hover:text-dark-800 inline-flex items-center gap-1"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    <span>Kembali Masuk</span>
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 

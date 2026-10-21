@@ -75,6 +75,7 @@ export default function TransaksiMasukPage() {
   const [formSumber, setFormSumber] = useState<SumberBarangMasuk>('Pembelian');
   const [formTanggal, setFormTanggal] = useState<string>(new Date().toISOString().split('T')[0]);
   const [formNoReferensi, setFormNoReferensi] = useState<string>('');
+  const [formNoDokumen, setFormNoDokumen] = useState<string>('');
   const [formItems, setFormItems] = useState<FormMasukItem[]>([
     { id_barang: null, nama_barang: '', jumlah: 1, keterangan: '', is_new: false, satuan: 'Buah', kategori: 'Alat Tulis Kantor' }
   ]);
@@ -256,6 +257,7 @@ export default function TransaksiMasukPage() {
     setFormSumber('Pembelian');
     const today = new Date().toISOString().split('T')[0];
     setFormTanggal(today);
+    setFormNoDokumen(generateNextDocNo(today, transaksiList));
     setFormNoReferensi(generateNextNoRef('Pembelian', today, transaksiList));
     setFormItems([
       { id_barang: null, nama_barang: '', jumlah: 1, keterangan: '', is_new: false, satuan: 'Buah', kategori: 'Alat Tulis Kantor' }
@@ -276,6 +278,7 @@ export default function TransaksiMasukPage() {
     setEditItem(trx);
     setFormSumber(trx.sumber);
     setFormTanggal(trx.tanggal);
+    setFormNoDokumen(trx.no_dokumen || '');
     setFormNoReferensi(trx.no_referensi || '');
     setFormKeterangan(trx.keterangan || '');
     setActiveSearchIdx(null);
@@ -359,7 +362,7 @@ export default function TransaksiMasukPage() {
     showToast(`Barang baru "${newB.nama_barang}" berhasil didaftarkan ke Master Barang & langsung dipilih!`, 'success');
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formItems.length === 0) {
       alert('Tambahkan minimal 1 item barang');
@@ -427,6 +430,33 @@ export default function TransaksiMasukPage() {
 
     let updatedList: TransaksiMasuk[];
 
+    // Nomor dokumen: terisi otomatis bernomor urut, tetapi boleh diubah manual.
+    // Tetap divalidasi unik — nomor ganda otomatis diakhiri -2, -3, dst.
+    let docNo = (formNoDokumen || '').trim();
+    if (!docNo) docNo = generateNextDocNo(formTanggal, transaksiList);
+    const allDocNos = new Set<string>();
+    transaksiList.forEach(t => { if (t?.no_dokumen) allDocNos.add(t.no_dokumen); });
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('sipersedia_transaksi_masuk');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((t: any) => { if (t?.no_dokumen) allDocNos.add(t.no_dokumen); });
+          }
+        }
+      } catch {}
+    }
+    if (editItem) allDocNos.delete(editItem.no_dokumen);
+    if (allDocNos.has(docNo)) {
+      let seq = 2;
+      while (allDocNos.has(`${docNo}-${seq}`)) seq++;
+      docNo = `${docNo}-${seq}`;
+    }
+
+    // Simpanan pending operasi cloud ke dokumen transaksi (ditunggu sebelum update stok)
+    let trxDiCloud: Promise<boolean> = Promise.resolve(true);
+
     if (editItem) {
       // 1. Revert stok lama
       editItem.items.forEach(oldItem => {
@@ -448,11 +478,12 @@ export default function TransaksiMasukPage() {
         });
       });
 
-      // 3. Update transaksi list
+      // 3. Update transaksi list (termasuk nomor dokumen bila diubah manual)
       updatedList = transaksiList.map(t => {
         if (t.id === editItem.id) {
           return {
             ...t,
+            no_dokumen: docNo,
             tanggal: formTanggal,
             sumber: formSumber,
             no_referensi: formNoReferensi.trim() || null,
@@ -463,7 +494,19 @@ export default function TransaksiMasukPage() {
         return t;
       });
 
-      showToast(`Transaksi ${editItem.no_dokumen} berhasil diperbarui!`, 'success');
+      // Sinkronkan hasil edit ke Cloud Database —
+      // tanpa ini, data remote lama akan menimpa hasil edit pada sinkronisasi berikutnya.
+      // Urutan penting: hapus dokumen lama dulu (no_dokumen unik), lalu simpan yang baru,
+      // dan BARU update stok — supaya perhitungan titik awal (baseline) stok di server tepat.
+      if (editItem.no_dokumen !== docNo) {
+        await deleteTransaksiMasukRemote(editItem.no_dokumen);
+      }
+      const editedTrx = updatedList.find(t => t.id === editItem.id);
+      if (editedTrx) {
+        trxDiCloud = pushTransaksiMasuk(editedTrx);
+      }
+
+      showToast(`Transaksi ${docNo} berhasil diperbarui!`, 'success');
     } else {
       // Transaksi baru
       preparedItems.forEach(newItem => {
@@ -475,7 +518,6 @@ export default function TransaksiMasukPage() {
         });
       });
 
-      const docNo = generateNextDocNo(formTanggal, transaksiList);
       const newTrx: TransaksiMasuk = {
         id: Date.now() + Math.floor(Math.random() * 1000),
         no_dokumen: docNo,
@@ -488,25 +530,32 @@ export default function TransaksiMasukPage() {
         created_at: new Date().toISOString(),
       };
       updatedList = [newTrx, ...transaksiList];
-      // Simpan transaksi masuk ke Cloud Database
-      pushTransaksiMasuk(newTrx);
+      // Simpan transaksi masuk ke Cloud Database (dilanjutkan setelah tahap update stok)
+      trxDiCloud = pushTransaksiMasuk(newTrx);
       showToast(`Dokumen transaksi masuk ${newTrx.no_dokumen} (${preparedItems.length} item) berhasil dicatat!`, 'success');
     }
 
-    // Daftarkan master barang baru jika ada (dengan stok yang sudah terhitung benar)
-    newBarangToPush.forEach(nb => {
+    // Daftarkan master barang baru (dengan stok yang sudah terhitung benar)
+    const pushBarangTerbaru = newBarangToPush.map(nb => {
       const actualStok = nextBarang.find(b => b.id === nb.id)?.stok ?? nb.stok;
-      pushBarang({ ...nb, stok: actualStok });
+      return pushBarang({ ...nb, stok: actualStok });
     });
+
+    // Tunggu dokumen & master barang baru tersimpan dulu di cloud,
+    // agar saat server menghitung ulang titik awal (baseline) stok,
+    // riwayat transaksinya sudah lengkap dan tidak terjadi salah hitung.
+    await Promise.all([trxDiCloud, ...pushBarangTerbaru]);
 
     // Update stok di Cloud Database hanya untuk item yang terlibat di transaksi
     // ponytail: Hanya update item dalam transaksi, hindari n-loop ke 80+ item
+    const pembaruanStok: Promise<boolean>[] = [];
     preparedItems.forEach(item => {
       const bObj = nextBarang.find(b => b.id === item.id_barang);
       if (bObj) {
-        updateBarangStockRemote(bObj.id, bObj.stok);
+        pembaruanStok.push(updateBarangStockRemote(bObj.id, bObj.stok));
       }
     });
+    await Promise.all(pembaruanStok);
 
     setBarangList(nextBarang);
     localStorage.setItem('sipersedia_barang_list', JSON.stringify(nextBarang));
@@ -776,6 +825,22 @@ export default function TransaksiMasukPage() {
                       required
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="input-label text-xs font-semibold text-dark-700">
+                    Nomor Dokumen <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    className="input text-xs font-mono font-medium"
+                    placeholder="Contoh: BM-2026/10/001"
+                    value={formNoDokumen}
+                    onChange={(e) => setFormNoDokumen(e.target.value)}
+                    required
+                  />
+                  <p className="text-[10px] text-dark-400 mt-1">
+                    Terisi otomatis dengan nomor urut — boleh diubah manual sesuai kebutuhan (mis. melanjutkan urutan nota).
+                  </p>
                 </div>
 
                 <div>

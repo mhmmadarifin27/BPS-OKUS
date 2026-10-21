@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { MapPin, Plus, Edit2, Trash2, X, Package, AlertTriangle, CheckCircle2, Search } from 'lucide-react';
+import { pushMasterItem, deleteMasterItem, fetchAndSyncMaster } from '@/lib/master-sync';
 
 interface LokasiItem {
   id: number;
@@ -42,6 +43,11 @@ export default function LokasiPage() {
       }
     }
 
+    // Tarik terbaru dari cloud (mengatasi race saat halaman terbuka lebih dulu dari sinkronisasi layout)
+    fetchAndSyncMaster('lokasi').then((rows) => {
+      if (Array.isArray(rows) && rows.length > 0) setLokasiList(rows);
+    });
+
     const storedLok = localStorage.getItem('sipersedia_lokasi_list');
     if (storedLok) {
       try {
@@ -77,7 +83,7 @@ export default function LokasiPage() {
     setShowModal(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNama.trim()) {
       alert('Nama lokasi tidak boleh kosong');
@@ -91,6 +97,14 @@ export default function LokasiPage() {
           ? { ...l, nama: formNama.trim(), deskripsi: formDeskripsi.trim() }
           : l
       );
+      const changedItem = updatedList.find((l) => l.id === editItem.id);
+      if (changedItem) {
+        if (changedItem.nama !== editItem.nama) {
+          // Nama diganti: singkirkan nama lama di cloud dulu agar tidak dobel
+          await deleteMasterItem('lokasi', { nama: editItem.nama });
+        }
+        pushMasterItem('lokasi', changedItem);
+      }
       showNotification(`Lokasi "${formNama.trim()}" berhasil diperbarui!`, 'success');
     } else {
       const newItem: LokasiItem = {
@@ -100,6 +114,8 @@ export default function LokasiPage() {
         jumlah_barang: 0,
       };
       updatedList = [...lokasiList, newItem];
+      // Sinkronkan ke Supabase agar terlihat di seluruh perangkat
+      pushMasterItem('lokasi', newItem);
       showNotification(`Lokasi "${formNama.trim()}" berhasil ditambahkan!`, 'success');
     }
 
@@ -114,6 +130,8 @@ export default function LokasiPage() {
     const updated = lokasiList.filter((l) => l.id !== deleteCandidate.id);
     setLokasiList(updated);
     localStorage.setItem('sipersedia_lokasi_list', JSON.stringify(updated));
+    // Sinkronkan penghapusan ke Supabase
+    deleteMasterItem('lokasi', { nama: targetName });
     setDeleteCandidate(null);
     showNotification(`Lokasi "${targetName}" berhasil dihapus.`, 'info');
   };

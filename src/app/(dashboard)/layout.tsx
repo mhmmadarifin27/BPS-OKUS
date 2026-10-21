@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import { initOrMigrateStore } from '@/lib/data-management';
+import { syncAllMasterData } from '@/lib/master-sync';
 import { cn } from '@/lib/utils';
 
 interface UserData {
@@ -68,6 +69,9 @@ export default function DashboardLayout({
 
     // Inisialisasi awal / migrasi data bersih untuk pengujian fitur per fitur
     initOrMigrateStore();
+
+    // Sinkronkan daftar master (kategori/satuan/lokasi/tim) antar perangkat via Supabase
+    syncAllMasterData();
 
     const handleProfileUpdate = () => {
       loadUser();
