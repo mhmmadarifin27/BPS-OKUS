@@ -44,6 +44,9 @@ export async function fetchAndSyncMaster(tipe: MasterTipe): Promise<any[] | null
     }
 
     localStorage.setItem(LOCAL_KEY[tipe], JSON.stringify(rows));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('masterDataUpdated', { detail: { tipe, rows } }));
+    }
     return rows;
   } catch (e) {
     console.warn(`[MasterSync] Gagal menarik master ${tipe}:`, e);

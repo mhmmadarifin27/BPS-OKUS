@@ -72,6 +72,9 @@ export default function DashboardLayout({
 
     // Sinkronkan daftar master (kategori/satuan/lokasi/tim) antar perangkat via Supabase
     syncAllMasterData();
+    const masterSyncInterval = setInterval(() => {
+      syncAllMasterData();
+    }, 15000);
 
     const handleProfileUpdate = () => {
       loadUser();
@@ -94,6 +97,7 @@ export default function DashboardLayout({
     window.addEventListener('beforeprint', handleBeforePrint);
     window.addEventListener('afterprint', handleAfterPrint);
     return () => {
+      clearInterval(masterSyncInterval);
       window.removeEventListener('storage', handleProfileUpdate);
       window.removeEventListener('profileUpdated', handleProfileUpdate);
       window.removeEventListener('beforeprint', handleBeforePrint);

@@ -19,6 +19,7 @@ import {
   updateBarangFullRemote,
   pushTransaksiKeluar,
 } from '@/lib/sync-service';
+import { fetchAndSyncMaster } from '@/lib/master-sync';
 
 export default function BarangPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -210,6 +211,39 @@ export default function BarangPage() {
       }
     }
 
+    // Tarik master data terbaru langsung dari cloud Supabase
+    fetchAndSyncMaster('kategori').then((rows) => {
+      if (rows && rows.length > 0) {
+        const names = rows.map((k: any) => k.nama || k.nama_kategori).filter(Boolean);
+        if (names.length > 0) setKategoriOptions(names);
+      }
+    });
+    fetchAndSyncMaster('satuan').then((rows) => {
+      if (rows && rows.length > 0) {
+        const names = rows.map((s: any) => s.nama || s.nama_satuan).filter(Boolean);
+        if (names.length > 0) setSatuanOptions(names);
+      }
+    });
+    fetchAndSyncMaster('lokasi').then((rows) => {
+      if (rows && rows.length > 0) {
+        const names = rows.map((l: any) => l.nama || l.nama_lokasi).filter(Boolean);
+        if (names.length > 0) setLokasiOptions(names);
+      }
+    });
+
+    const handleMasterUpdate = (e: any) => {
+      const { tipe, rows } = e.detail || {};
+      if (rows && rows.length > 0) {
+        const names = rows.map((x: any) => x.nama || x.nama_kategori || x.nama_satuan || x.nama_lokasi).filter(Boolean);
+        if (names.length > 0) {
+          if (tipe === 'kategori') setKategoriOptions(names);
+          if (tipe === 'satuan') setSatuanOptions(names);
+          if (tipe === 'lokasi') setLokasiOptions(names);
+        }
+      }
+    };
+    window.addEventListener('masterDataUpdated', handleMasterUpdate);
+
     // Tarik data barang resmi terbaru dari Cloud Database Supabase
     fetchAndSyncBarang().then((cloudBarang) => {
       if (cloudBarang) {
@@ -228,7 +262,10 @@ export default function BarangPage() {
       });
     }, 7000);
 
-    return () => clearInterval(syncInterval);
+    return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener('masterDataUpdated', handleMasterUpdate);
+    };
   }, []);
 
   const handleOpenAddBarang = () => {
