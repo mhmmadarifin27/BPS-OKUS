@@ -6,7 +6,7 @@
 import { ALL_81_BARANG_BPS, SAMPLE_TRANSAKSI_MASUK, SAMPLE_TRANSAKSI_KELUAR, mockUsers } from './mock-data';
 import { TIM_PEMOHON_LIST, formatNamaPJ } from '@/types';
 
-export const DATA_STORE_VERSION = 'v20261021_reset_total_0';
+export const DATA_STORE_VERSION = 'v20261021_reset_final_0';
 
 /**
  * Inisialisasi otomatis pada awal aplikasi dimuat.
@@ -75,10 +75,12 @@ export function initOrMigrateStore(): boolean {
     const existingKategori = localStorage.getItem('sipersedia_kategori_list');
     if (!existingKategori) {
       localStorage.setItem('sipersedia_kategori_list', JSON.stringify([
-        { id: 1, nama: 'Alat Tulis Kantor', deskripsi: 'Perlengkapan tulis perkantoran', jumlah_barang: 3 },
-        { id: 2, nama: 'Peralatan Komputer', deskripsi: 'Perangkat keras dan aksesoris komputer', jumlah_barang: 1 },
-        { id: 3, nama: 'Perlengkapan Cetakan', deskripsi: 'Formulir, buku, dan cetakan dinas', jumlah_barang: 1 },
-        { id: 4, nama: 'Perlengkapan Lapangan', deskripsi: 'Perlengkapan sensus & survei lapangan', jumlah_barang: 1 },
+        { id: 1, nama: 'Alat Tulis Kantor', deskripsi: 'Perlengkapan tulis perkantoran', jumlah_barang: 0 },
+        { id: 2, nama: 'Peralatan Komputer', deskripsi: 'Perangkat keras dan aksesoris komputer', jumlah_barang: 0 },
+        { id: 3, nama: 'Perlengkapan Rumah Tangga', deskripsi: 'Kebutuhan rumah tangga kantor', jumlah_barang: 0 },
+        { id: 4, nama: 'Alat Kebersihan', deskripsi: 'Peralatan untuk kebersihan kantor', jumlah_barang: 0 },
+        { id: 5, nama: 'Perlengkapan Cetakan', deskripsi: 'Formulir, buku, dan cetakan', jumlah_barang: 0 },
+        { id: 6, nama: 'Peralatan Elektronik', deskripsi: 'Perangkat elektronik kantor', jumlah_barang: 0 },
       ]));
     }
 
@@ -87,19 +89,19 @@ export function initOrMigrateStore(): boolean {
       localStorage.setItem('sipersedia_satuan_list', JSON.stringify([
         { id: 1, nama: 'Buah' },
         { id: 2, nama: 'Rim' },
-        { id: 3, nama: 'Kotak' },
-        { id: 4, nama: 'Unit' },
-        { id: 5, nama: 'Lusin' },
+        { id: 8, nama: 'Lembar' },
+        { id: 11, nama: 'Kotak' },
+        { id: 14, nama: 'Pack' },
+        { id: 15, nama: 'Gulungan' },
+        { id: 16, nama: 'Meter' },
+        { id: 17, nama: 'Pcs' },
       ]));
     }
 
     const existingLokasi = localStorage.getItem('sipersedia_lokasi_list');
     if (!existingLokasi) {
       localStorage.setItem('sipersedia_lokasi_list', JSON.stringify([
-        { id: 1, nama: 'Gudang ATK', deskripsi: 'Ruang penyimpanan khusus alat tulis kantor', jumlah_barang: 3 },
-        { id: 2, nama: 'Rak Server', deskripsi: 'Tempat penyimpanan peralatan IT', jumlah_barang: 1 },
-        { id: 3, nama: 'Ruang Arsip', deskripsi: 'Ruang penyimpanan dokumen dan cetakan', jumlah_barang: 1 },
-        { id: 4, nama: 'Gudang Utama', deskripsi: 'Ruang penyimpanan utama lantai 1', jumlah_barang: 1 },
+        { id: 5, nama: 'Gudang Persediaan Barang', deskripsi: 'Ruang Penyediaan Lantai 1 Sub Bagian Umum', jumlah_barang: 0 },
       ]));
     }
 
