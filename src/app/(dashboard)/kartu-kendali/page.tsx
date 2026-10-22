@@ -1316,7 +1316,7 @@ export default function KartuKendaliPage() {
                       <tr className="bg-gray-100 font-bold text-black text-center">
                         <th className="border border-black px-1 py-1 w-10">Nomor</th>
                         <th className="border border-black px-1.5 py-1 w-16">KODE</th>
-                        <th className="border border-black px-2 py-1 text-left">U R A I A N</th>
+                        <th className="border border-black px-2 py-1 text-center">U R A I A N</th>
                         <th className="border border-black px-2 py-1 text-center w-28">JUMLAH Saldo 1 Januari</th>
                         <th className="border border-black px-1.5 py-1 text-center w-16">MASUK</th>
                         <th className="border border-black px-1.5 py-1 text-center w-16">KELUAR</th>
@@ -1332,7 +1332,7 @@ export default function KartuKendaliPage() {
                             <tr key={item.nomor} className="text-black">
                               <td className="border border-black px-1 py-0.5 text-center">{idx + 1}</td>
                               <td className="border border-black px-1.5 py-0.5 text-center font-mono">{item.kode}</td>
-                              <td className="border border-black px-2 py-0.5">{item.uraian}</td>
+                              <td className="border border-black px-2 py-0.5 text-center">{item.uraian}</td>
                               <td className="border border-black px-2 py-0.5 text-center font-semibold">
                                 {item.saldo_1_januari > 0 ? formatNumber(item.saldo_1_januari) : '-'}
                               </td>

@@ -1401,10 +1401,10 @@ export default function TransaksiMasukPage() {
                 <thead>
                   <tr className="bg-gray-100 text-black font-bold">
                     <th className="border border-black px-2 py-2 print:py-2.5 text-center w-10">No</th>
-                    <th className="border border-black px-3 py-2 print:py-2.5 text-left">Nama Barang</th>
+                    <th className="border border-black px-3 py-2 print:py-2.5 text-center">Nama Barang</th>
                     <th className="border border-black px-3 py-2 print:py-2.5 text-center w-28 print:w-32">Satuan</th>
                     <th className="border border-black px-3 py-2 print:py-2.5 text-center w-24 print:w-28">Jumlah</th>
-                    <th className="border border-black px-3 py-2 print:py-2.5 text-left">Keterangan</th>
+                    <th className="border border-black px-3 py-2 print:py-2.5 text-center">Keterangan</th>
                   </tr>
                   {/* Baris penomoran (1)-(5): Ramping */}
                   <tr className="bg-gray-50 text-[9px] print:text-[10pt] text-gray-700 font-bold text-center h-4">
@@ -1419,10 +1419,10 @@ export default function TransaksiMasukPage() {
                   {showPrintPreview.items.map((item, idx) => (
                     <tr key={idx} className="text-black">
                       <td className="border border-black px-2 py-2.5 print:py-3.5 text-center">{idx + 1}</td>
-                      <td className="border border-black px-3 py-2.5 print:py-3.5 font-medium">{item.barang?.nama_barang}</td>
+                      <td className="border border-black px-3 py-2.5 print:py-3.5 text-center font-medium">{item.barang?.nama_barang}</td>
                       <td className="border border-black px-3 py-2.5 print:py-3.5 text-center">{item.barang?.satuan?.nama_satuan || 'Buah'}</td>
                       <td className="border border-black px-3 py-2.5 print:py-3.5 text-center font-normal">{item.jumlah}</td>
-                      <td className="border border-black px-3 py-2.5 print:py-3.5">{item.keterangan || '-'}</td>
+                      <td className="border border-black px-3 py-2.5 print:py-3.5 text-center">{item.keterangan || '-'}</td>
                     </tr>
                   ))}
                 </tbody>

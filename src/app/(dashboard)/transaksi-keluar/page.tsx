@@ -1063,7 +1063,7 @@ export default function TransaksiKeluarPage() {
                   {showPrintPreview.items.map((item, idx) => (
                     <tr key={idx} className="text-black">
                       <td className="border border-black px-2 py-2.5 print:py-3.5 text-center font-medium">{idx + 1}</td>
-                      <td className="border border-black px-3 py-2.5 print:py-3.5 font-medium">{item.barang?.nama_barang}</td>
+                      <td className="border border-black px-3 py-2.5 print:py-3.5 text-center font-medium">{item.barang?.nama_barang}</td>
                       <td className="border border-black px-3 py-2.5 print:py-3.5 text-center">{item.barang?.satuan?.nama_satuan}</td>
                       <td className="border border-black px-3 py-2.5 print:py-3.5 text-center font-normal">{item.jumlah}</td>
                       <td className="border border-black px-3 py-2.5 print:py-3.5 text-center">{item.keterangan || '-'}</td>

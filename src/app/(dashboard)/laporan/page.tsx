@@ -736,7 +736,7 @@ export default function LaporanPage() {
                     {activeReportData.map((item) => (
                       <tr key={item.no} className="text-black leading-tight">
                         <td style={{ whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1 text-center font-medium">{item.no}</td>
-                        <td style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }} className="border border-black px-1.5 py-1 font-medium">{item.uraian_barang}</td>
+                        <td style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }} className="border border-black px-1.5 py-1 text-center font-medium">{item.uraian_barang}</td>
                         <td style={{ whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1 text-center">{item.satuan}</td>
                         <td style={{ whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1 text-center">{item.saldo_juli || '-'}</td>
                         <td style={{ whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1 text-center">{item.pembelian || '-'}</td>
@@ -780,7 +780,7 @@ export default function LaporanPage() {
                     {activeReportData.map((item) => (
                       <tr key={item.no} className="text-black leading-tight">
                         <td className="border border-black px-1 py-1 text-center font-medium">{item.no}</td>
-                        <td className="border border-black px-1.5 py-1 font-medium break-words">{item.uraian_barang}</td>
+                        <td className="border border-black px-1.5 py-1 text-center font-medium break-words">{item.uraian_barang}</td>
                         <td className="border border-black px-1 py-1 text-center font-bold">{item.pengeluaran || '-'}</td>
                         <td className="border border-black px-0.5 py-1 text-center">{item.tim?.umum || '-'}</td>
                         <td className="border border-black px-0.5 py-1 text-center">{item.tim?.sosial || '-'}</td>
