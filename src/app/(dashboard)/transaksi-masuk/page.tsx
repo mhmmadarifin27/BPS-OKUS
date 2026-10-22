@@ -50,6 +50,17 @@ export default function TransaksiMasukPage() {
   const [editItem, setEditItem] = useState<TransaksiMasuk | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<TransaksiMasuk | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'info'; message: string } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [expandedTrxIds, setExpandedTrxIds] = useState<Set<number>>(new Set());
+
+  const toggleExpandTrx = (id: number) => {
+    setExpandedTrxIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Quick Add Master Barang Modal State
   const [showQuickAddBarang, setShowQuickAddBarang] = useState(false);
@@ -400,6 +411,7 @@ export default function TransaksiMasukPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
     if (formItems.length === 0) {
       alert('Tambahkan minimal 1 item barang');
       return;
@@ -417,8 +429,10 @@ export default function TransaksiMasukPage() {
       }
     }
 
-    let nextBarang = [...barangList];
-    const newBarangToPush: Barang[] = [];
+    setIsSaving(true);
+    try {
+      let nextBarang = [...barangList];
+      const newBarangToPush: Barang[] = [];
 
     // 1. Resolve setiap item (master barang yang ada atau buat baru dengan stok awal 0)
     const findMasterId = (key: string, name: string): number | null => {
@@ -639,6 +653,12 @@ export default function TransaksiMasukPage() {
 
     setActiveSearchIdx(null);
     setShowModal(false);
+    } catch (err: any) {
+      console.error('[TransaksiMasuk Save Error]:', err);
+      alert('Terjadi kesalahan saat menyimpan transaksi.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const confirmDelete = () => {
@@ -766,7 +786,7 @@ export default function TransaksiMasukPage() {
             </thead>
             <tbody>
               {filtered.map((trx) => (
-                <tr key={trx.id}>
+                <tr key={trx.id} className="[&>td]:align-top [&>td]:py-3">
                   <td>
                     <span className="font-mono text-xs font-medium text-bps-blue bg-bps-blue-50 px-2 py-1 rounded">
                       {trx.no_dokumen}
@@ -791,15 +811,36 @@ export default function TransaksiMasukPage() {
                     </div>
                   </td>
                   <td>
-                    <div className="space-y-1">
-                      {trx.items.map((item, idx) => (
+                    <div className="space-y-1 min-w-[220px]">
+                      {trx.items.length > 3 && (
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-bps-blue-50 text-bps-blue">
+                            {trx.items.length} Barang
+                          </span>
+                          <span className="text-[10px] text-dark-400">
+                            Total: {trx.items.reduce((s, i) => s + (Number(i.jumlah) || 0), 0)} unit
+                          </span>
+                        </div>
+                      )}
+                      {(expandedTrxIds.has(trx.id) ? trx.items : trx.items.slice(0, 3)).map((item, idx) => (
                         <div key={idx} className="text-xs">
                           <span className="font-medium text-dark-700">{item.barang?.nama_barang}</span>
                           <span className="text-dark-400 ml-1">
-                            ({item.jumlah} {item.barang?.satuan?.nama_satuan})
+                            ({item.jumlah} {item.barang?.satuan?.nama_satuan || 'Buah'})
                           </span>
                         </div>
                       ))}
+                      {trx.items.length > 3 && (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpandTrx(trx.id)}
+                          className="text-[11px] font-medium text-bps-blue hover:text-bps-blue-700 hover:underline pt-1 block"
+                        >
+                          {expandedTrxIds.has(trx.id)
+                            ? '▲ Ringkas tampilan'
+                            : `▼ + ${trx.items.length - 3} barang lainnya...`}
+                        </button>
+                      )}
                     </div>
                   </td>
                   <td className="text-xs text-dark-500 max-w-[150px] truncate">{trx.keterangan || '-'}</td>
@@ -1169,12 +1210,19 @@ export default function TransaksiMasukPage() {
               </div>
 
               <div className="flex items-center justify-end gap-3 p-5 border-t border-dark-100 bg-dark-50 rounded-b-2xl">
-                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary text-xs">
+                <button type="button" disabled={isSaving} onClick={() => setShowModal(false)} className="btn-secondary text-xs">
                   Batal
                 </button>
-                <button type="submit" className="btn-success text-xs inline-flex items-center gap-1.5">
-                  <ArrowDownToLine className="w-4 h-4" />
-                  <span>{editItem ? 'Simpan Perubahan' : 'Catat Barang Masuk'}</span>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className={cn(
+                    "btn-success text-xs inline-flex items-center gap-1.5",
+                    isSaving && "opacity-60 cursor-not-allowed"
+                  )}
+                >
+                  <ArrowDownToLine className={cn("w-4 h-4", isSaving && "animate-bounce")} />
+                  <span>{isSaving ? 'Menyimpan...' : (editItem ? 'Simpan Perubahan' : 'Catat Barang Masuk')}</span>
                 </button>
               </div>
             </form>
