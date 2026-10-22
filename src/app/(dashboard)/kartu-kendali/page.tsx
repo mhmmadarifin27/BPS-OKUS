@@ -453,7 +453,7 @@ export default function KartuKendaliPage() {
                 <th className="border border-black px-0.5 py-0.5 w-[3.5%] text-center">No.</th>
                 <th className="border border-black px-0.5 py-0.5 w-[10%] text-center">No. Bon/Faktur</th>
                 <th className="border border-black px-0.5 py-0.5 w-[8%] text-center">Tgl M/K</th>
-                <th className="border border-black px-1 py-0.5 text-left w-[14.5%] leading-tight">Uraian Pemasukan/Pengeluaran</th>
+                <th className="border border-black px-1 py-0.5 text-center w-[14.5%] leading-tight">Uraian Pemasukan/Pengeluaran</th>
                 <th className="border border-black px-0.5 py-0.5 w-[4.5%] text-center leading-tight">Masuk<br/><span className="text-[7.5px] print:text-[6pt] font-normal">(M)</span></th>
                 <th className="border border-black px-0.5 py-0.5 w-[4.5%] text-center leading-tight">Keluar<br/><span className="text-[7.5px] print:text-[6pt] font-normal">(K)</span></th>
                 <th className="border border-black px-0.5 py-0.5 w-[5%] text-center">Sisa</th>
@@ -462,7 +462,7 @@ export default function KartuKendaliPage() {
                 <th className="border border-black px-0.5 py-0.5 w-[3.5%] text-center">No.</th>
                 <th className="border border-black px-0.5 py-0.5 w-[10%] text-center">No. Bon/Faktur</th>
                 <th className="border border-black px-0.5 py-0.5 w-[8%] text-center">Tgl M/K</th>
-                <th className="border border-black px-1 py-0.5 text-left w-[14.5%] leading-tight">Uraian Pemasukan/Pengeluaran</th>
+                <th className="border border-black px-1 py-0.5 text-center w-[14.5%] leading-tight">Uraian Pemasukan/Pengeluaran</th>
                 <th className="border border-black px-0.5 py-0.5 w-[4.5%] text-center leading-tight">Masuk<br/><span className="text-[7.5px] print:text-[6pt] font-normal">(M)</span></th>
                 <th className="border border-black px-0.5 py-0.5 w-[4.5%] text-center leading-tight">Keluar<br/><span className="text-[7.5px] print:text-[6pt] font-normal">(K)</span></th>
                 <th className="border border-black px-0.5 py-0.5 w-[5%] text-center">Sisa</th>
