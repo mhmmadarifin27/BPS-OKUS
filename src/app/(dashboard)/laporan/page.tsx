@@ -92,19 +92,31 @@ export default function LaporanPage() {
 
   // Hitung Data Rekapitulasi secara real-time dari mutasi transaksi aktif
   const getComputedReportData = (targetBulan: number, targetTahun: number): RekapitulasiAgustusItem[] => {
-    const matchesMonthYear = (tgl: string, m: number, y: number) => {
-      if (!tgl) return false;
+    const parseYearMonth = (tgl: string): { y: number; m: number } | null => {
+      if (!tgl) return null;
       const clean = tgl.split('T')[0];
       const parts = clean.split('-');
       if (parts.length >= 2) {
         const itemY = parseInt(parts[0], 10);
         const itemM = parseInt(parts[1], 10);
-        if (!isNaN(itemY) && !isNaN(itemM)) {
-          return itemM === m && itemY === y;
-        }
+        if (!isNaN(itemY) && !isNaN(itemM)) return { y: itemY, m: itemM };
       }
       const d = new Date(tgl);
-      return !isNaN(d.getTime()) && d.getMonth() + 1 === m && d.getFullYear() === y;
+      if (!isNaN(d.getTime())) return { y: d.getFullYear(), m: d.getMonth() + 1 };
+      return null;
+    };
+
+    const matchesMonthYear = (tgl: string, m: number, y: number) => {
+      const ym = parseYearMonth(tgl);
+      return ym ? ym.m === m && ym.y === y : false;
+    };
+
+    const isBeforeMonthYear = (tgl: string, m: number, y: number) => {
+      const ym = parseYearMonth(tgl);
+      if (!ym) return false;
+      if (ym.y < y) return true;
+      if (ym.y === y && ym.m < m) return true;
+      return false;
     };
 
     const itemsToProcess = barangList.length > 0 ? barangList : mockBarang;
@@ -168,58 +180,46 @@ export default function LaporanPage() {
         return { beli, transfer, keluar, rusak, usang, tim };
       };
 
-      let saldoAwal = 0;
-      let pembelian = 0;
-      let transferMasuk = 0;
-      let pengeluaran = 0;
-      let barangRusak = 0;
-      let barangUsang = 0;
-      let timDist = { umum: 0, sosial: 0, ipds: 0, pertanian: 0, distribusi: 0, neraca: 0, pek: 0 };
-
-      // Titik awal resmi pembukuan persediaan: Oktober 2026 (Bulan 10)
-      const START_BULAN = 10;
-      const START_TAHUN = 2026;
-
-      const isAfterOrAtStart =
-        targetTahun > START_TAHUN ||
-        (targetTahun === START_TAHUN && targetBulan >= START_BULAN);
-
-      if (isAfterOrAtStart) {
-        let runningStock = 0;
-
-        // Roll-forward saldo bulan demi bulan mulai Oktober 2026
-        if (targetTahun === START_TAHUN) {
-          for (let m = START_BULAN; m < targetBulan; m++) {
-            const mutasi = getMonthMutasi(m, targetTahun);
-            runningStock = Math.max(0, runningStock + mutasi.beli + mutasi.transfer - mutasi.keluar);
-          }
-        } else {
-          for (let m = START_BULAN; m <= 12; m++) {
-            const mutasi = getMonthMutasi(m, START_TAHUN);
-            runningStock = Math.max(0, runningStock + mutasi.beli + mutasi.transfer - mutasi.keluar);
-          }
-          for (let y = START_TAHUN + 1; y < targetTahun; y++) {
-            for (let m = 1; m <= 12; m++) {
-              const mutasi = getMonthMutasi(m, y);
-              runningStock = Math.max(0, runningStock + mutasi.beli + mutasi.transfer - mutasi.keluar);
+      // Saldo Awal: seluruh transaksi masuk dikurangi keluar sebelum periode target
+      let masukSebelum = 0;
+      transaksiMasukList.forEach(t => {
+        if (isBeforeMonthYear(t.tanggal, targetBulan, targetTahun)) {
+          t.items?.forEach(itm => {
+            const isMatch =
+              String(itm.id_barang) === String(b.id) ||
+              (itm.barang?.id && String(itm.barang.id) === String(b.id)) ||
+              (itm.barang?.nama_barang && itm.barang.nama_barang.trim().toLowerCase() === b.nama_barang.trim().toLowerCase());
+            if (isMatch) {
+              masukSebelum += Number(itm.jumlah) || 0;
             }
-          }
-          for (let m = 1; m < targetBulan; m++) {
-            const mutasi = getMonthMutasi(m, targetTahun);
-            runningStock = Math.max(0, runningStock + mutasi.beli + mutasi.transfer - mutasi.keluar);
-          }
+          });
         }
+      });
 
-        saldoAwal = runningStock;
+      let keluarSebelum = 0;
+      transaksiKeluarList.forEach(t => {
+        if (t.status === 'pending' || t.status === 'rejected') return;
+        if (isBeforeMonthYear(t.tanggal, targetBulan, targetTahun)) {
+          t.items?.forEach(itm => {
+            const isMatch =
+              String(itm.id_barang) === String(b.id) ||
+              (itm.barang?.id && String(itm.barang.id) === String(b.id)) ||
+              (itm.barang?.nama_barang && itm.barang.nama_barang.trim().toLowerCase() === b.nama_barang.trim().toLowerCase());
+            if (isMatch) {
+              keluarSebelum += Number(itm.jumlah) || 0;
+            }
+          });
+        }
+      });
 
-        const curMutasi = getMonthMutasi(targetBulan, targetTahun);
-        pembelian = curMutasi.beli;
-        transferMasuk = curMutasi.transfer;
-        pengeluaran = curMutasi.keluar;
-        barangRusak = curMutasi.rusak;
-        barangUsang = curMutasi.usang;
-        timDist = curMutasi.tim;
-      }
+      const saldoAwal = Math.max(0, masukSebelum - keluarSebelum);
+      const curMutasi = getMonthMutasi(targetBulan, targetTahun);
+      const pembelian = curMutasi.beli;
+      const transferMasuk = curMutasi.transfer;
+      const pengeluaran = curMutasi.keluar;
+      const barangRusak = curMutasi.rusak;
+      const barangUsang = curMutasi.usang;
+      const timDist = curMutasi.tim;
 
       // Rumus resmi BPS: Total Persediaan = Saldo Awal + Pembelian + Transfer Masuk - Pengeluaran
       const total = Math.max(0, saldoAwal + pembelian + transferMasuk - pengeluaran);
