@@ -214,11 +214,11 @@ export default function KartuKendaliPage() {
     const pengeluaran_bulanan = Array.from({ length: 12 }, (_, i) => getMonthlyOut(i + 1));
     const totalPengeluaranTahunan = pengeluaran_bulanan.reduce((a, b) => a + b, 0);
 
-    const LEFT_CAPACITY = 13;
+    const LEFT_CAPACITY = 14;
+    const hasRight = entries.length > LEFT_CAPACITY;
     const leftEntries = entries.slice(0, LEFT_CAPACITY);
     const rightEntries = entries.slice(LEFT_CAPACITY);
-    const transactionRows = Math.max(13, Math.max(leftEntries.length, rightEntries.length));
-    const activeRowCount = 1 + transactionRows;
+    const activeRowCount = Math.max(14, hasRight ? 1 + rightEntries.length : 14);
 
     const leftTotalMasuk = leftEntries.reduce((s, e) => s + e.masuk, 0);
     const leftTotalKeluar = leftEntries.reduce((s, e) => s + e.keluar, 0);
@@ -486,51 +486,38 @@ export default function KartuKendaliPage() {
             </thead>
             <tbody>
               {Array.from({ length: c.activeRowCount }).map((_, rIdx) => {
-                const isPindahanRow = rIdx === 0;
-                const left = rIdx > 0 ? c.leftEntries[rIdx - 1] : null;
-                const right = rIdx > 0 ? c.rightEntries[rIdx - 1] : null;
+                const hasRightEntries = c.rightEntries.length > 0;
+                const left = c.leftEntries[rIdx] || null;
+                const right = hasRightEntries && rIdx > 0 ? c.rightEntries[rIdx - 1] : null;
+                const isPindahanRowRight = hasRightEntries && rIdx === 0;
 
                 return (
                   <tr key={rIdx} className={cn('text-black hover:bg-gray-50/50', isPrint ? 'h-[16px] print:h-[23px]' : 'h-[21px]')}>
                     {/* Sisi Kiri */}
-                    {isPindahanRow ? (
-                      <>
-                        <td className="border border-black px-1 py-0 text-center"></td>
-                        <td className="border border-black px-1 py-0 font-mono text-[8.5px]"></td>
-                        <td className="border border-black px-1 py-0 text-center"></td>
-                        <td className="border border-black px-1.5 py-0 font-medium"></td>
-                        <td className="border border-black px-1 py-0 text-center"></td>
-                        <td className="border border-black px-1 py-0 text-center"></td>
-                        <td className="border border-black px-1 py-0 text-center"></td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="border border-black px-1 py-0 text-center font-medium">
-                          {left ? rIdx : ''}
-                        </td>
-                        <td className="border border-black px-1 py-0 font-mono text-[8px]">
-                          {left?.no_referensi || ''}
-                        </td>
-                        <td className="border border-black px-1 py-0 text-center">
-                          {left ? formatDateShort(left.tanggal) : ''}
-                        </td>
-                        <td className="border border-black px-1.5 py-0 font-medium">
-                          {left?.uraian || ''}
-                        </td>
-                        <td className="border border-black px-1 py-0 text-center font-bold text-emerald-800">
-                          {left && left.masuk > 0 ? left.masuk : (left ? '-' : '')}
-                        </td>
-                        <td className="border border-black px-1 py-0 text-center font-bold text-rose-800">
-                          {left && left.keluar > 0 ? left.keluar : (left ? '-' : '')}
-                        </td>
-                        <td className="border border-black px-1 py-0 text-center font-bold">
-                          {left ? left.sisa : ''}
-                        </td>
-                      </>
-                    )}
+                    <td className="border border-black px-1 py-0 text-center font-medium">
+                      {left ? rIdx + 1 : ''}
+                    </td>
+                    <td className="border border-black px-1 py-0 font-mono text-[8px]">
+                      {left?.no_referensi || ''}
+                    </td>
+                    <td className="border border-black px-1 py-0 text-center">
+                      {left ? formatDateShort(left.tanggal) : ''}
+                    </td>
+                    <td className="border border-black px-1.5 py-0 font-medium">
+                      {left?.uraian || ''}
+                    </td>
+                    <td className="border border-black px-1 py-0 text-center font-bold text-emerald-800">
+                      {left && left.masuk > 0 ? left.masuk : (left ? '-' : '')}
+                    </td>
+                    <td className="border border-black px-1 py-0 text-center font-bold text-rose-800">
+                      {left && left.keluar > 0 ? left.keluar : (left ? '-' : '')}
+                    </td>
+                    <td className="border border-black px-1 py-0 text-center font-bold">
+                      {left ? left.sisa : ''}
+                    </td>
 
                     {/* Sisi Kanan */}
-                    {isPindahanRow ? (
+                    {isPindahanRowRight ? (
                       <>
                         <td colSpan={4} className="border border-black px-2 py-0 font-bold italic text-black">
                           Pindahan
@@ -538,7 +525,7 @@ export default function KartuKendaliPage() {
                         <td className="border border-black px-1 py-0 text-center font-bold text-emerald-800"></td>
                         <td className="border border-black px-1 py-0 text-center font-bold text-rose-800"></td>
                         <td className="border border-black px-1 py-0 text-center font-extrabold text-blue-900 bg-blue-50/30">
-                          {c.leftEntries.length > 0 ? c.leftLastSisa : (c.entries.length === 0 ? '' : c.stock_awal_tahun)}
+                          {c.leftLastSisa}
                         </td>
                       </>
                     ) : (
