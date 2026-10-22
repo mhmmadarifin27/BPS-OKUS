@@ -8,7 +8,6 @@ import {
   HelpCircle, ShieldCheck, Plus, X, AlertTriangle, Package
 } from 'lucide-react';
 import { mockKartuKendali, mockBarang, mockTransaksiKeluar, mockTransaksiMasuk } from '@/lib/mock-data';
-import { DATA_DAFTAR_PERSEDIAAN_PDF1, type DaftarPersediaanPDFItem } from '@/lib/data-daftar-persediaan-pdf1';
 import { TIM_PEMOHON_LIST, getStoredTimList, formatNamaPJ, TimPemohon } from '@/types';
 import type { KartuKendali, Barang, TransaksiKeluar, TransaksiMasuk } from '@/types';
 import { cn, formatDateShort, formatNumber } from '@/lib/utils';
@@ -129,20 +128,8 @@ export default function KartuKendaliPage() {
 
   // Helper fungsi untuk menghitung kartu kendali lengkap bagi barang tertentu
   const computeSingleCard = (targetBarang: Barang) => {
-    // Cari data resmi BPS berdasarkan nama uraian persis terlebih dahulu, lalu kode
-    const itemPdfByUraian = DATA_DAFTAR_PERSEDIAAN_PDF1.find(
-      p => p.uraian.trim().toLowerCase() === targetBarang?.nama_barang.trim().toLowerCase()
-    );
-    const itemPdfByKode = DATA_DAFTAR_PERSEDIAAN_PDF1.find(
-      p => p.kode === targetBarang?.kode_barang
-    );
-    const itemPdf = itemPdfByUraian || itemPdfByKode;
-
-    // ponytail: Saldo 1 Januari resmi BPS untuk barang master awal, untuk barang baru dimulai dari 0
-    const stockAwal = (targetBarang as any)?.saldo_1_januari 
-      ?? (targetBarang as any)?.stok_awal 
-      ?? itemPdf?.saldo_1_januari 
-      ?? 0;
+    // ponytail: Sistem dimulai resmi dari Oktober 2026, saldo awal sebelum pembukuan adalah 0
+    const stockAwal = (targetBarang as any)?.stok_awal ?? 0;
 
     const isMatch = (i: any) => {
       if (!i) return false;
@@ -212,9 +199,6 @@ export default function KartuKendaliPage() {
     const totalKeluar = entries.reduce((s, e) => s + e.keluar, 0);
     let sisaAkhir = entries.length > 0 ? entries[entries.length - 1].sisa : stockAwal;
     if (targetBarang?.stok !== undefined && targetBarang.stok === 0 && mMasuk.length === 0) {
-      sisaAkhir = 0;
-    }
-    if (itemPdf && (itemPdf.saldo_1_januari + (itemPdf.masuk || 0) - (itemPdf.keluar || 0)) <= 0 && mMasuk.length === 0) {
       sisaAkhir = 0;
     }
 
@@ -597,26 +581,21 @@ export default function KartuKendaliPage() {
     (b.kode_barang && b.kode_barang.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const filteredDaftarPersediaan = (
-    barangList.length < 80
-      ? availableBarangList
-          .filter(b => Number(b.stok || 0) > 0)
-          .map((b, idx) => ({
-            nomor: idx + 1,
-            kode: b.kode_barang,
-            uraian: b.nama_barang,
-            saldo_1_januari: b.stok,
-            masuk: 0,
-            keluar: 0,
-            satuan: b.satuan?.nama_satuan || 'Buah',
-          }))
-      : DATA_DAFTAR_PERSEDIAAN_PDF1
-          .filter(item => (item.saldo_1_januari + item.masuk - item.keluar) > 0)
-          .map((item, idx) => ({ ...item, nomor: idx + 1 }))
-  ).filter(item =>
-    item.uraian.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.kode.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredDaftarPersediaan = availableBarangList
+    .filter(b => Number(b.stok || 0) > 0)
+    .map((b, idx) => ({
+      nomor: idx + 1,
+      kode: b.kode_barang,
+      uraian: b.nama_barang,
+      saldo_1_januari: 0,
+      masuk: b.stok,
+      keluar: 0,
+      satuan: b.satuan?.nama_satuan || 'Buah',
+    }))
+    .filter(item =>
+      item.uraian.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.kode.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   // Navigasi ke Kartu Barang tertentu dari Daftar Persediaan
   const handleSelectFromDaftar = (kode: string, uraian: string) => {
@@ -869,7 +848,7 @@ export default function KartuKendaliPage() {
             ) : activeTab === 'katalog' ? (
               <span>Menampilkan <strong>{filteredAllCards.length} dari {allCardsList.length} kartu kendali</strong></span>
             ) : (
-              <span>Menampilkan <strong>{DATA_DAFTAR_PERSEDIAAN_PDF1.length} item</strong> persediaan barang</span>
+              <span>Menampilkan <strong>{filteredDaftarPersediaan.length} item</strong> persediaan barang</span>
             )}
           </div>
         </div>
@@ -1346,8 +1325,7 @@ export default function KartuKendaliPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {DATA_DAFTAR_PERSEDIAAN_PDF1
-                        .filter(item => (item.saldo_1_januari + item.masuk - item.keluar) > 0)
+                      {filteredDaftarPersediaan
                         .map((item, idx) => {
                           const sisa = item.saldo_1_januari + item.masuk - item.keluar;
                           return (
@@ -1356,13 +1334,13 @@ export default function KartuKendaliPage() {
                               <td className="border border-black px-1.5 py-0.5 text-center font-mono">{item.kode}</td>
                               <td className="border border-black px-2 py-0.5">{item.uraian}</td>
                               <td className="border border-black px-2 py-0.5 text-center font-semibold">
-                                {formatNumber(item.saldo_1_januari)}
+                                {item.saldo_1_januari > 0 ? formatNumber(item.saldo_1_januari) : '-'}
                               </td>
                               <td className="border border-black px-1.5 py-0.5 text-center">
                                 {item.masuk > 0 ? formatNumber(item.masuk) : '-'}
                               </td>
                               <td className="border border-black px-1.5 py-0.5 text-center font-semibold">
-                                {item.keluar > 0 ? formatNumber(item.keluar) : '0'}
+                                {item.keluar > 0 ? formatNumber(item.keluar) : '-'}
                               </td>
                               <td className="border border-black px-1.5 py-0.5 text-center">{item.satuan}</td>
                               <td className="border border-black px-2 py-0.5 text-center font-bold">

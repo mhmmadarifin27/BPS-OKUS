@@ -5,7 +5,7 @@ import {
   FileBarChart, Printer, Edit2, Check,
   Package, ArrowDownToLine, ArrowUpFromLine, Wallet, X, Layers, Users, ShieldCheck,
 } from 'lucide-react';
-import { DATA_REKAPITULASI_AGUSTUS, type RekapitulasiAgustusItem } from '@/lib/data-rekapitulasi-agustus';
+import { type RekapitulasiAgustusItem } from '@/lib/data-rekapitulasi-agustus';
 import { mockBarang, mockTransaksiMasuk, mockTransaksiKeluar } from '@/lib/mock-data';
 import type { Barang, TransaksiMasuk, TransaksiKeluar } from '@/types';
 import { cn, formatNumber, getMonthName, getTeksBeritaAcaraOpname, formatTanggalTandaTangan } from '@/lib/utils';
@@ -110,10 +110,6 @@ export default function LaporanPage() {
     const itemsToProcess = barangList.length > 0 ? barangList : mockBarang;
 
     return itemsToProcess.map((b, i) => {
-      const agustusBase = DATA_REKAPITULASI_AGUSTUS.find(
-        item => item.uraian_barang.trim().toLowerCase() === b.nama_barang.trim().toLowerCase()
-      );
-
       // Mutasi untuk bulan tertentu
       const getMonthMutasi = (m: number, y: number) => {
         let beli = 0;
@@ -123,28 +119,9 @@ export default function LaporanPage() {
         let usang = 0;
         const tim = { umum: 0, sosial: 0, ipds: 0, pertanian: 0, distribusi: 0, neraca: 0, pek: 0 };
 
-        // Data resmi BPS untuk Agustus 2026
-        if (m === 8 && y === 2026 && agustusBase) {
-          beli += agustusBase.pembelian;
-          transfer += agustusBase.transfer_masuk;
-          keluar += agustusBase.pengeluaran;
-          rusak += agustusBase.barang_rusak || 0;
-          usang += agustusBase.barang_usang || 0;
-          if (agustusBase.tim) {
-            tim.umum += agustusBase.tim.umum;
-            tim.sosial += agustusBase.tim.sosial;
-            tim.ipds += agustusBase.tim.ipds;
-            tim.pertanian += agustusBase.tim.pertanian;
-            tim.distribusi += agustusBase.tim.distribusi;
-            tim.neraca += agustusBase.tim.neraca;
-            tim.pek += agustusBase.tim.pek;
-          }
-        }
-
         // Transaksi masuk dari database / form
         transaksiMasukList.forEach(t => {
           if (matchesMonthYear(t.tanggal, m, y)) {
-            if (m === 8 && y === 2026 && mockTransaksiMasuk.some(mock => mock.id === t.id)) return;
             t.items?.forEach(itm => {
               const isMatch =
                 String(itm.id_barang) === String(b.id) ||
@@ -163,7 +140,6 @@ export default function LaporanPage() {
         transaksiKeluarList.forEach(t => {
           if (t.status === 'pending' || t.status === 'rejected') return;
           if (matchesMonthYear(t.tanggal, m, y)) {
-            if (m === 8 && y === 2026 && mockTransaksiKeluar.some(mock => mock.id === t.id)) return;
             t.items?.forEach(itm => {
               const isMatch =
                 String(itm.id_barang) === String(b.id) ||
@@ -200,28 +176,43 @@ export default function LaporanPage() {
       let barangUsang = 0;
       let timDist = { umum: 0, sosial: 0, ipds: 0, pertanian: 0, distribusi: 0, neraca: 0, pek: 0 };
 
-      if (targetTahun === 2026 && targetBulan >= 8) {
-        // ponytail: Jika barang resmi BPS gunakan saldo_juli, jika barang baru yang baru didaftarkan saldo awal diatur 0
-        let runningStock = agustusBase ? agustusBase.saldo_juli : 0;
+      // Titik awal resmi pembukuan persediaan: Oktober 2026 (Bulan 10)
+      const START_BULAN = 10;
+      const START_TAHUN = 2026;
 
-        // Roll-forward bulan demi bulan hingga sebelum bulan target
-        for (let m = 8; m < targetBulan; m++) {
-          const mutasi = getMonthMutasi(m, targetTahun);
-          runningStock = Math.max(0, runningStock + mutasi.beli + mutasi.transfer - mutasi.keluar);
+      const isAfterOrAtStart =
+        targetTahun > START_TAHUN ||
+        (targetTahun === START_TAHUN && targetBulan >= START_BULAN);
+
+      if (isAfterOrAtStart) {
+        let runningStock = 0;
+
+        // Roll-forward saldo bulan demi bulan mulai Oktober 2026
+        if (targetTahun === START_TAHUN) {
+          for (let m = START_BULAN; m < targetBulan; m++) {
+            const mutasi = getMonthMutasi(m, targetTahun);
+            runningStock = Math.max(0, runningStock + mutasi.beli + mutasi.transfer - mutasi.keluar);
+          }
+        } else {
+          for (let m = START_BULAN; m <= 12; m++) {
+            const mutasi = getMonthMutasi(m, START_TAHUN);
+            runningStock = Math.max(0, runningStock + mutasi.beli + mutasi.transfer - mutasi.keluar);
+          }
+          for (let y = START_TAHUN + 1; y < targetTahun; y++) {
+            for (let m = 1; m <= 12; m++) {
+              const mutasi = getMonthMutasi(m, y);
+              runningStock = Math.max(0, runningStock + mutasi.beli + mutasi.transfer - mutasi.keluar);
+            }
+          }
+          for (let m = 1; m < targetBulan; m++) {
+            const mutasi = getMonthMutasi(m, targetTahun);
+            runningStock = Math.max(0, runningStock + mutasi.beli + mutasi.transfer - mutasi.keluar);
+          }
         }
 
         saldoAwal = runningStock;
 
         const curMutasi = getMonthMutasi(targetBulan, targetTahun);
-        pembelian = curMutasi.beli;
-        transferMasuk = curMutasi.transfer;
-        pengeluaran = curMutasi.keluar;
-        barangRusak = curMutasi.rusak;
-        barangUsang = curMutasi.usang;
-        timDist = curMutasi.tim;
-      } else {
-        const curMutasi = getMonthMutasi(targetBulan, targetTahun);
-        saldoAwal = Math.max(0, b.stok - curMutasi.beli - curMutasi.transfer + curMutasi.keluar);
         pembelian = curMutasi.beli;
         transferMasuk = curMutasi.transfer;
         pengeluaran = curMutasi.keluar;
