@@ -132,11 +132,15 @@ export async function GET() {
     });
 
     // Konsistensi stok: barang yang PUNYA riwayat transaksi dihitung dari
-    // baseline + (masuk - keluar). Barang tanpa riwayat memakai stok tersimpan.
+    // baseline + (masuk - keluar). Barang dari Transaksi Masuk tanpa riwayat
+    // mutasi otomatis memiliki stok 0 (bukan mempertahankan sisa lama).
     const correctedData = barangs.map((b: any) => {
-      const totalIn = inMap[b.id];
+      const totalIn = inMap[b.id] || 0;
       const totalOut = outMap[b.id] || 0;
-      if (totalIn !== undefined) {
+      const hasTransactions = inMap[b.id] !== undefined || outMap[b.id] !== undefined;
+      const isFromTransaksiMasuk = (b.deskripsi || '').includes('Ditambahkan via Transaksi Masuk');
+
+      if (hasTransactions || isFromTransaksiMasuk || typeof b.stok_baseline === 'number' || baselineFallback[String(b.id)] !== undefined) {
         const baseline =
           typeof b.stok_baseline === 'number'
             ? b.stok_baseline

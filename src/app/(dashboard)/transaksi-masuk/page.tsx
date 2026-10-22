@@ -16,6 +16,7 @@ import {
   fetchAndSyncBarang,
   updateBarangStockRemote,
   pushBarang,
+  deleteBarangRemote,
   urutkanTransaksi,
 } from '@/lib/sync-service';
 import { fetchAndSyncMaster } from '@/lib/master-sync';
@@ -661,28 +662,57 @@ export default function TransaksiMasukPage() {
     }
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteCandidate) return;
     const targetDoc = deleteCandidate.no_dokumen;
 
-    // Kurangi stok master barang yang pernah ditambahkan oleh dokumen ini
     let nextBarang = [...barangList];
+    const itemsToUpdateStock: { id: number; stok: number }[] = [];
+    const itemsToDeleteFromMaster: number[] = [];
+
     deleteCandidate.items.forEach(itm => {
-      nextBarang = nextBarang.map(b => {
-        if (b.id === itm.id_barang) {
-          return { ...b, stok: Math.max(0, b.stok - itm.jumlah) };
-        }
-        return b;
-      });
+      const bObj = nextBarang.find(b => String(b.id) === String(itm.id_barang));
+      if (!bObj) return;
+
+      const newStok = Math.max(0, bObj.stok - itm.jumlah);
+
+      // Cek apakah barang ini punya transaksi masuk lain
+      const hasOtherIncoming = transaksiList.some(
+        t => t.id !== deleteCandidate.id && t.items.some(i => String(i.id_barang) === String(itm.id_barang))
+      );
+
+      // Jika barang didaftarkan via transaksi masuk & tidak punya transaksi masuk lain,
+      // dan stoknya jadi 0: hapus sekalian dari Master Barang agar tidak jadi barang hantu 0 stok.
+      const isPureNewItem = (bObj.deskripsi || '').includes('Ditambahkan via Transaksi Masuk') && !hasOtherIncoming && newStok === 0;
+
+      if (isPureNewItem) {
+        itemsToDeleteFromMaster.push(bObj.id);
+      } else {
+        itemsToUpdateStock.push({ id: bObj.id, stok: newStok });
+      }
     });
+
+    if (itemsToDeleteFromMaster.length > 0) {
+      nextBarang = nextBarang.filter(b => !itemsToDeleteFromMaster.includes(b.id));
+    }
+    nextBarang = nextBarang.map(b => {
+      const u = itemsToUpdateStock.find(item => item.id === b.id);
+      return u ? { ...b, stok: u.stok } : b;
+    });
+
     setBarangList(nextBarang);
     localStorage.setItem('sipersedia_barang_list', JSON.stringify(nextBarang));
 
     const updated = transaksiList.filter(t => t.id !== deleteCandidate.id);
     setTransaksiList(updated);
     localStorage.setItem('sipersedia_transaksi_masuk', JSON.stringify(updated));
-    // Hapus juga di cloud database
-    deleteTransaksiMasukRemote(targetDoc);
+
+    // Sinkronkan ke Cloud Database:
+    const p1 = deleteTransaksiMasukRemote(targetDoc);
+    const p2 = itemsToDeleteFromMaster.map(id => deleteBarangRemote(id));
+    const p3 = itemsToUpdateStock.map(it => updateBarangStockRemote(it.id, it.stok));
+
+    await Promise.all([p1, ...p2, ...p3]);
 
     // Bersihkan cache laporan statis
     if (typeof window !== 'undefined') {
@@ -692,7 +722,7 @@ export default function TransaksiMasukPage() {
     }
 
     setDeleteCandidate(null);
-    showToast(`Transaksi ${targetDoc} berhasil dihapus & stok disesuaikan.`, 'info');
+    showToast(`Transaksi ${targetDoc} berhasil dihapus & data barang disinkronkan.`, 'info');
   };
 
   const handlePrint = () => {
