@@ -19,8 +19,8 @@ import {
 } from '@/lib/sync-service';
 
 const BULAN_NAMES = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+  'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'
 ];
 
 export default function KartuKendaliPage() {
@@ -307,7 +307,7 @@ export default function KartuKendaliPage() {
   const renderCardContent = (c: ReturnType<typeof computeSingleCard>, isPrint: boolean = false) => {
     if (!c) return null;
     return (
-      <div className="bg-white text-black w-full">
+      <div className={cn('bg-white text-black w-full', !isPrint && 'min-w-[960px]')}>
         {/* Header Kartu Sesuai Format Resmi PDF Halaman 3 */}
         <div className={cn('text-center border-b border-dark-200', isPrint ? 'mb-1 print:mb-1 pb-1' : 'mb-5 pb-3')}>
           <h2 className={cn('font-extrabold text-black uppercase tracking-wider', isPrint ? 'text-xs print:text-[11.5pt] print:tracking-normal' : 'text-base')}>
@@ -384,26 +384,26 @@ export default function KartuKendaliPage() {
         <div className={cn('overflow-x-auto print:overflow-visible', isPrint ? 'mb-1.5 print:mb-1' : 'mb-6')}>
           <table className={cn(
             'w-full border-collapse border border-black text-center table-fixed',
-            isPrint ? 'text-[8.5px] print:text-[7.5pt]' : 'text-xs'
+            isPrint ? 'text-[8.5px] print:text-[7.5pt]' : 'text-[10px]'
           )}>
             <thead>
               <tr className="bg-gray-100 font-bold text-black">
                 <th colSpan={12} className="border border-black py-0.5 uppercase tracking-wider text-[8.5px] print:text-[7.5pt]">
                   Banyaknya Pengeluaran Tiap-Tiap Bulan
                 </th>
-                <th rowSpan={2} className="border border-black px-1 py-0.5 text-[8px] print:text-[7.5pt] leading-tight w-[13.3%]" title="Jumlah Pengeluaran">
+                <th rowSpan={2} className="border border-black px-1 py-0.5 text-[8.5px] print:text-[7.5pt] leading-tight w-[13.3%]" title="Jumlah Pengeluaran">
                   Jumlah Pengeluaran
                 </th>
-                <th rowSpan={2} className="border border-black px-1 py-0.5 text-[8px] print:text-[7.5pt] leading-tight w-[13.3%] bg-amber-50/40" title="Saldo Awal Tahun (Per 1 Januari)">
+                <th rowSpan={2} className="border border-black px-1 py-0.5 text-[8.5px] print:text-[7.5pt] leading-tight w-[13.3%] bg-amber-50/40" title="Saldo Awal Tahun (Per 1 Januari)">
                   Stock Awal tahun
                 </th>
-                <th rowSpan={2} className="border border-black px-1 py-0.5 text-[8px] print:text-[7.5pt] leading-tight w-[13.4%] bg-blue-50/40" title="Saldo Akhir Tahun (Per 31 Desember)">
+                <th rowSpan={2} className="border border-black px-1 py-0.5 text-[8.5px] print:text-[7.5pt] leading-tight w-[13.4%] bg-blue-50/40" title="Saldo Akhir Tahun (Per 31 Desember)">
                   Stock Akhir tahun
                 </th>
               </tr>
               <tr className="bg-gray-50 font-semibold text-black text-[8px] print:text-[7pt]">
                 {BULAN_NAMES.map((bln, idx) => (
-                  <th key={idx} className="border border-black px-0.5 py-0.5 w-[5%]">
+                  <th key={idx} className="border border-black px-0.5 py-0.5 w-[5%] text-center">
                     {bln}
                   </th>
                 ))}
@@ -445,27 +445,27 @@ export default function KartuKendaliPage() {
         <div className={cn('overflow-x-auto print:overflow-visible', isPrint ? 'mb-1 print:mb-0' : 'mb-6')}>
           <table className={cn(
             'w-full border-collapse border border-black table-fixed',
-            isPrint ? 'text-[8px] print:text-[7pt]' : 'text-[10px]'
+            isPrint ? 'text-[8px] print:text-[7pt]' : 'text-[9.5px]'
           )}>
             <thead>
               <tr className="bg-gray-100 font-bold text-black text-center">
                 {/* Kolom Sisi Kiri (50%) */}
-                <th className="border border-black px-1 py-0.5 w-[3.5%]">No.</th>
-                <th className="border border-black px-1 py-0.5 w-[10%]">No. Bon/Faktur</th>
-                <th className="border border-black px-1 py-0.5 w-[8%]">Tgl M/K</th>
-                <th className="border border-black px-1.5 py-0.5 text-left w-[14.5%]">Uraian Pemasukan/Pengeluaran</th>
-                <th className="border border-black px-1 py-0.5 w-[4.5%]">Masuk (M)</th>
-                <th className="border border-black px-1 py-0.5 w-[4.5%]">Keluar (K)</th>
-                <th className="border border-black px-1.5 py-0.5 w-[5%]">Sisa</th>
+                <th className="border border-black px-0.5 py-0.5 w-[3.5%] text-center">No.</th>
+                <th className="border border-black px-0.5 py-0.5 w-[10%] text-center">No. Bon/Faktur</th>
+                <th className="border border-black px-0.5 py-0.5 w-[8%] text-center">Tgl M/K</th>
+                <th className="border border-black px-1 py-0.5 text-left w-[14.5%] leading-tight">Uraian Pemasukan/Pengeluaran</th>
+                <th className="border border-black px-0.5 py-0.5 w-[4.5%] text-center leading-tight">Masuk<br/><span className="text-[7.5px] print:text-[6pt] font-normal">(M)</span></th>
+                <th className="border border-black px-0.5 py-0.5 w-[4.5%] text-center leading-tight">Keluar<br/><span className="text-[7.5px] print:text-[6pt] font-normal">(K)</span></th>
+                <th className="border border-black px-0.5 py-0.5 w-[5%] text-center">Sisa</th>
 
                 {/* Kolom Sisi Kanan (50%) */}
-                <th className="border border-black px-1 py-0.5 w-[3.5%]">No.</th>
-                <th className="border border-black px-1 py-0.5 w-[10%]">No. Bon/Faktur</th>
-                <th className="border border-black px-1 py-0.5 w-[8%]">Tgl M/K</th>
-                <th className="border border-black px-1.5 py-0.5 text-left w-[14.5%]">Uraian Pemasukan/Pengeluaran</th>
-                <th className="border border-black px-1 py-0.5 w-[4.5%]">Masuk (M)</th>
-                <th className="border border-black px-1 py-0.5 w-[4.5%]">Keluar (K)</th>
-                <th className="border border-black px-1.5 py-0.5 w-[5%]">Sisa</th>
+                <th className="border border-black px-0.5 py-0.5 w-[3.5%] text-center">No.</th>
+                <th className="border border-black px-0.5 py-0.5 w-[10%] text-center">No. Bon/Faktur</th>
+                <th className="border border-black px-0.5 py-0.5 w-[8%] text-center">Tgl M/K</th>
+                <th className="border border-black px-1 py-0.5 text-left w-[14.5%] leading-tight">Uraian Pemasukan/Pengeluaran</th>
+                <th className="border border-black px-0.5 py-0.5 w-[4.5%] text-center leading-tight">Masuk<br/><span className="text-[7.5px] print:text-[6pt] font-normal">(M)</span></th>
+                <th className="border border-black px-0.5 py-0.5 w-[4.5%] text-center leading-tight">Keluar<br/><span className="text-[7.5px] print:text-[6pt] font-normal">(K)</span></th>
+                <th className="border border-black px-0.5 py-0.5 w-[5%] text-center">Sisa</th>
               </tr>
               <tr className="bg-gray-50 text-[7px] print:text-[6.5pt] text-gray-600 font-bold text-center h-3">
                 <th className="border border-black py-0 px-0.5 leading-tight">(1)</th>
