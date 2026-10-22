@@ -331,15 +331,15 @@ export default function TransaksiMasukPage() {
     setActiveSearchIdx(null);
     if (trx.items && trx.items.length > 0) {
       setFormItems(trx.items.map(item => {
-        const found = item.barang || barangList.find(b => b.id === item.id_barang);
+        const found = item.barang || barangList.find(b => String(b.id) === String(item.id_barang)) || barangList.find(b => b.nama_barang.toLowerCase().trim() === (item.barang?.nama_barang || '').toLowerCase().trim());
         return {
-          id_barang: item.id_barang,
-          nama_barang: found?.nama_barang || `Barang #${item.id_barang}`,
+          id_barang: item.id_barang ?? found?.id ?? null,
+          nama_barang: found?.nama_barang || item.barang?.nama_barang || `Barang #${item.id_barang}`,
           jumlah: item.jumlah,
           keterangan: item.keterangan || '',
           is_new: false,
-          satuan: found?.satuan?.nama_satuan || 'Buah',
-          kategori: found?.kategori?.nama_kategori || 'Alat Tulis Kantor',
+          satuan: found?.satuan?.nama_satuan || item.barang?.satuan?.nama_satuan || 'Buah',
+          kategori: found?.kategori?.nama_kategori || item.barang?.kategori?.nama_kategori || 'Alat Tulis Kantor',
         };
       }));
     } else {
@@ -987,10 +987,12 @@ export default function TransaksiMasukPage() {
 
                   <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
                     {formItems.map((item, idx) => {
-                      const selectedB = item.id_barang ? barangList.find(b => b.id === item.id_barang) : null;
+                      const selectedB = item.id_barang
+                        ? barangList.find(b => String(b.id) === String(item.id_barang))
+                        : barangList.find(b => b.nama_barang.toLowerCase().trim() === (item.nama_barang || '').toLowerCase().trim());
                       const currentStock = selectedB ? selectedB.stok : 0;
                       const currentSatuan = selectedB?.satuan?.nama_satuan || item.satuan || 'Buah';
-                      const isNewItem = item.is_new || (!selectedB && (item.nama_barang || '').trim().length > 0);
+                      const isNewItem = !editItem && (item.is_new || (!selectedB && (item.nama_barang || '').trim().length > 0));
 
                       const matchingBarang = barangList
                         .filter(b => b.nama_barang.toLowerCase().includes((item.nama_barang || '').toLowerCase().trim()))
@@ -1018,13 +1020,13 @@ export default function TransaksiMasukPage() {
                               <label className="input-label text-[11px] font-semibold text-dark-700 mb-0">
                                 Nama Barang <span className="text-red-500">*</span>
                               </label>
-                              {selectedB && (
+                              {!editItem && selectedB && (
                                 <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
                                   <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                                   Tersedia (Sisa Stok: {selectedB.stok} {currentSatuan})
                                 </span>
                               )}
-                              {isNewItem && !selectedB && (
+                              {!editItem && isNewItem && !selectedB && (
                                 <span className="text-[10px] bg-bps-blue-50 text-bps-blue-700 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-bps-blue-200">
                                   ✨ Barang Baru (Stok Awal: 0)
                                 </span>
@@ -1169,9 +1171,11 @@ export default function TransaksiMasukPage() {
                               <label className="input-label text-[11px] font-semibold text-dark-700 mb-0">
                                 Jumlah Masuk ({currentSatuan}) <span className="text-red-500">*</span>
                               </label>
-                              <span className="text-[11px] text-dark-500">
-                                Sisa Stok: <strong className="text-dark-800">{currentStock}</strong> + Masuk: <strong className="text-bps-blue font-bold">{Number(item.jumlah) || 0}</strong> = Estimasi: <strong className="text-emerald-600 font-bold">{currentStock + (Number(item.jumlah) || 0)} {currentSatuan}</strong>
-                              </span>
+                              {!editItem && selectedB && !isNewItem && (
+                                <span className="text-[11px] text-dark-500">
+                                  Sisa Stok: <strong className="text-dark-800">{currentStock}</strong> + Masuk: <strong className="text-bps-blue font-bold">{Number(item.jumlah) || 0}</strong> = Estimasi: <strong className="text-emerald-600 font-bold">{currentStock + (Number(item.jumlah) || 0)} {currentSatuan}</strong>
+                                </span>
+                              )}
                             </div>
                             <input
                               type="number"
