@@ -1348,12 +1348,12 @@ export default function TransaksiMasukPage() {
             <style dangerouslySetInnerHTML={{ __html: `
               @page {
                 size: A4 portrait;
-                margin: 0;
+                margin: 14mm 15mm 12mm 15mm;
               }
               @media print {
                 @page {
                   size: A4 portrait;
-                  margin: 0;
+                  margin: 14mm 15mm 12mm 15mm;
                 }
                 html, body {
                   margin: 0 !important;
@@ -1363,12 +1363,23 @@ export default function TransaksiMasukPage() {
                   print-color-adjust: exact !important;
                 }
                 #print-area {
-                  page-break-inside: avoid !important;
-                  break-inside: avoid !important;
-                  padding: 10mm 15mm 10mm 15mm !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
                   width: 100% !important;
                   display: block !important;
                   box-sizing: border-box !important;
+                }
+                thead {
+                  display: table-header-group;
+                }
+                tr {
+                  page-break-inside: avoid !important;
+                  break-inside: avoid !important;
+                }
+                .signature-block {
+                  page-break-inside: avoid !important;
+                  break-inside: avoid !important;
+                  margin-top: 20px !important;
                 }
               }
             `}} />
