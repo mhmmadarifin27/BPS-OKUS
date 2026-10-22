@@ -1248,15 +1248,8 @@ export default function KartuKendaliPage() {
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
                   width: 100% !important;
-                  height: 206mm !important;
-                  min-height: 206mm !important;
-                  max-height: 206mm !important;
-                  padding: 5mm 8mm 5mm 8mm !important;
-                  display: flex !important;
-                  flex-direction: column !important;
-                  justify-content: space-between !important;
+                  padding: 6mm 10mm 6mm 10mm !important;
                   box-sizing: border-box !important;
-                  overflow: hidden !important;
                 }
                 .card-print-page:last-child {
                   page-break-after: avoid !important;
