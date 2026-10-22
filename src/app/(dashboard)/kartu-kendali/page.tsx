@@ -307,7 +307,7 @@ export default function KartuKendaliPage() {
   const renderCardContent = (c: ReturnType<typeof computeSingleCard>, isPrint: boolean = false) => {
     if (!c) return null;
     return (
-      <div className={cn('bg-white text-black', isPrint ? 'card-print-page' : '')}>
+      <div className="bg-white text-black w-full">
         {/* Header Kartu Sesuai Format Resmi PDF Halaman 3 */}
         <div className={cn('text-center border-b border-dark-200', isPrint ? 'mb-1 print:mb-1 pb-1' : 'mb-5 pb-3')}>
           <h2 className={cn('font-extrabold text-black uppercase tracking-wider', isPrint ? 'text-xs print:text-[11.5pt] print:tracking-normal' : 'text-base')}>
@@ -325,7 +325,7 @@ export default function KartuKendaliPage() {
               <img
                 src="/images/logo-bps.svg"
                 alt="Logo BPS"
-                className={cn('w-auto object-contain mb-0.5', isPrint ? 'h-9 print:h-9' : 'h-14')}
+                className={cn('w-auto object-contain mb-0.5', isPrint ? 'h-8 print:h-8' : 'h-14')}
               />
               <div
                 style={{ fontFamily: 'Arial, sans-serif', fontSize: isPrint ? '7.5pt' : '9pt', lineHeight: 1.15 }}
@@ -381,36 +381,36 @@ export default function KartuKendaliPage() {
         </div>
 
         {/* TABEL 1: Banyaknya Pengeluaran Tiap-Tiap Bulan (15 Kolom Horizontal: 12 Bulan + 3 Ringkasan) */}
-        <div className={cn('overflow-x-auto', isPrint ? 'mb-1.5 print:mb-1' : 'mb-6')}>
+        <div className={cn('overflow-x-auto print:overflow-visible', isPrint ? 'mb-1.5 print:mb-1' : 'mb-6')}>
           <table className={cn(
-            'w-full border-collapse border border-black text-center',
-            isPrint ? 'text-[8.5px] print:text-[8pt]' : 'text-xs'
+            'w-full border-collapse border border-black text-center table-fixed',
+            isPrint ? 'text-[8.5px] print:text-[7.5pt]' : 'text-xs'
           )}>
             <thead>
               <tr className="bg-gray-100 font-bold text-black">
                 <th colSpan={12} className="border border-black py-0.5 uppercase tracking-wider text-[8.5px] print:text-[7.5pt]">
                   Banyaknya Pengeluaran Tiap-Tiap Bulan
                 </th>
-                <th rowSpan={2} className="border border-black px-1 py-0.5 text-[8px] print:text-[7.5pt] leading-tight w-20 print:w-22">
+                <th rowSpan={2} className="border border-black px-1 py-0.5 text-[8px] print:text-[7.5pt] leading-tight w-[13.3%]" title="Jumlah Pengeluaran">
                   Jumlah Pengeluaran
                 </th>
-                <th rowSpan={2} className="border border-black px-1 py-0.5 text-[8px] print:text-[7.5pt] leading-tight w-20 print:w-22 bg-amber-50/40" title="Saldo Awal Tahun (Per 1 Januari)">
+                <th rowSpan={2} className="border border-black px-1 py-0.5 text-[8px] print:text-[7.5pt] leading-tight w-[13.3%] bg-amber-50/40" title="Saldo Awal Tahun (Per 1 Januari)">
                   Stock Awal tahun
                 </th>
-                <th rowSpan={2} className="border border-black px-1 py-0.5 text-[8px] print:text-[7.5pt] leading-tight w-20 print:w-22 bg-blue-50/40" title="Saldo Akhir Tahun (Per 31 Desember)">
+                <th rowSpan={2} className="border border-black px-1 py-0.5 text-[8px] print:text-[7.5pt] leading-tight w-[13.4%] bg-blue-50/40" title="Saldo Akhir Tahun (Per 31 Desember)">
                   Stock Akhir tahun
                 </th>
               </tr>
               <tr className="bg-gray-50 font-semibold text-black text-[8px] print:text-[7pt]">
                 {BULAN_NAMES.map((bln, idx) => (
-                  <th key={idx} className="border border-black px-0.5 py-0.5">
+                  <th key={idx} className="border border-black px-0.5 py-0.5 w-[5%]">
                     {bln}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              <tr className={cn('text-black font-semibold', isPrint ? 'h-4 print:h-[22px]' : 'h-7')}>
+              <tr className={cn('text-black font-semibold', isPrint ? 'h-4 print:h-[20px]' : 'h-7')}>
                 {BULAN_NAMES.map((_, idx) => {
                   const out = c.pengeluaran_bulanan[idx];
                   if (idx === 0) {
@@ -442,30 +442,30 @@ export default function KartuKendaliPage() {
         </div>
 
         {/* TABEL 2: Rincian Mutasi Barang Dual-Pane (14 Kolom) Sesuai Halaman 3 PDF */}
-        <div className={cn('overflow-x-auto', isPrint ? 'mb-1 print:mb-0' : 'mb-6')}>
+        <div className={cn('overflow-x-auto print:overflow-visible', isPrint ? 'mb-1 print:mb-0' : 'mb-6')}>
           <table className={cn(
-            'w-full border-collapse border border-black',
-            isPrint ? 'text-[8.5px] print:text-[8pt]' : 'text-[10px]'
+            'w-full border-collapse border border-black table-fixed',
+            isPrint ? 'text-[8px] print:text-[7pt]' : 'text-[10px]'
           )}>
             <thead>
               <tr className="bg-gray-100 font-bold text-black text-center">
-                {/* Kolom Sisi Kiri */}
-                <th className="border border-black px-1 py-0.5 w-7">No.</th>
-                <th className="border border-black px-1 py-0.5 w-20">No. Bon/Faktur</th>
-                <th className="border border-black px-1 py-0.5 w-16">Tgl M/K</th>
-                <th className="border border-black px-1.5 py-0.5 text-left">Uraian Pemasukan/Pengeluaran</th>
-                <th className="border border-black px-1 py-0.5 w-12">Masuk (M)</th>
-                <th className="border border-black px-1 py-0.5 w-12">Keluar (K)</th>
-                <th className="border border-black px-1.5 py-0.5 w-14">Sisa Barang</th>
+                {/* Kolom Sisi Kiri (50%) */}
+                <th className="border border-black px-1 py-0.5 w-[3.5%]">No.</th>
+                <th className="border border-black px-1 py-0.5 w-[10%]">No. Bon/Faktur</th>
+                <th className="border border-black px-1 py-0.5 w-[8%]">Tgl M/K</th>
+                <th className="border border-black px-1.5 py-0.5 text-left w-[14.5%]">Uraian Pemasukan/Pengeluaran</th>
+                <th className="border border-black px-1 py-0.5 w-[4.5%]">Masuk (M)</th>
+                <th className="border border-black px-1 py-0.5 w-[4.5%]">Keluar (K)</th>
+                <th className="border border-black px-1.5 py-0.5 w-[5%]">Sisa</th>
 
-                {/* Kolom Sisi Kanan */}
-                <th className="border border-black px-1 py-0.5 w-7">No.</th>
-                <th className="border border-black px-1 py-0.5 w-20">No. Bon/Faktur</th>
-                <th className="border border-black px-1 py-0.5 w-16">Tgl M/K</th>
-                <th className="border border-black px-1.5 py-0.5 text-left">Uraian Pemasukan/Pengeluaran</th>
-                <th className="border border-black px-1 py-0.5 w-12">Masuk (M)</th>
-                <th className="border border-black px-1 py-0.5 w-12">Keluar (K)</th>
-                <th className="border border-black px-1.5 py-0.5 w-14">Sisa Barang</th>
+                {/* Kolom Sisi Kanan (50%) */}
+                <th className="border border-black px-1 py-0.5 w-[3.5%]">No.</th>
+                <th className="border border-black px-1 py-0.5 w-[10%]">No. Bon/Faktur</th>
+                <th className="border border-black px-1 py-0.5 w-[8%]">Tgl M/K</th>
+                <th className="border border-black px-1.5 py-0.5 text-left w-[14.5%]">Uraian Pemasukan/Pengeluaran</th>
+                <th className="border border-black px-1 py-0.5 w-[4.5%]">Masuk (M)</th>
+                <th className="border border-black px-1 py-0.5 w-[4.5%]">Keluar (K)</th>
+                <th className="border border-black px-1.5 py-0.5 w-[5%]">Sisa</th>
               </tr>
               <tr className="bg-gray-50 text-[7px] print:text-[6.5pt] text-gray-600 font-bold text-center h-3">
                 <th className="border border-black py-0 px-0.5 leading-tight">(1)</th>
@@ -491,7 +491,7 @@ export default function KartuKendaliPage() {
                 const right = rIdx > 0 ? c.rightEntries[rIdx - 1] : null;
 
                 return (
-                  <tr key={rIdx} className={cn('text-black hover:bg-gray-50/50', isPrint ? 'h-[16px] print:h-[23px]' : 'h-[21px]')}>
+                  <tr key={rIdx} className={cn('text-black hover:bg-gray-50/50', isPrint ? 'h-[16px] print:h-[19px]' : 'h-[21px]')}>
                     {/* Sisi Kiri */}
                     {isPindahanRow ? (
                       <>
@@ -1228,12 +1228,12 @@ export default function KartuKendaliPage() {
             <style dangerouslySetInnerHTML={{ __html: `
               @page {
                 size: ${(previewMode === 'kartu' || previewMode === 'batch') ? 'A4 landscape' : 'A4 portrait'};
-                margin: 0;
+                margin: ${(previewMode === 'kartu' || previewMode === 'batch') ? '5mm 8mm 5mm 8mm' : '8mm 10mm 8mm 10mm'};
               }
               @media print {
                 @page {
                   size: ${(previewMode === 'kartu' || previewMode === 'batch') ? 'A4 landscape' : 'A4 portrait'};
-                  margin: 0;
+                  margin: ${(previewMode === 'kartu' || previewMode === 'batch') ? '5mm 8mm 5mm 8mm' : '8mm 10mm 8mm 10mm'};
                 }
                 html, body {
                   margin: 0 !important;
@@ -1241,27 +1241,38 @@ export default function KartuKendaliPage() {
                   background: #ffffff !important;
                   -webkit-print-color-adjust: exact !important;
                   print-color-adjust: exact !important;
+                  width: 100% !important;
+                }
+                #print-area {
+                  padding: 0 !important;
+                  margin: 0 !important;
+                  width: 100% !important;
+                }
+                .print-batch-wrapper {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  display: block !important;
                 }
                 .card-print-page {
+                  page-break-before: auto !important;
                   page-break-after: always !important;
                   break-after: page !important;
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
                   width: 100% !important;
-                  padding: 6mm 10mm 6mm 10mm !important;
+                  max-width: 100% !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
                   box-sizing: border-box !important;
+                  display: block !important;
                 }
-                .card-print-page:last-child {
-                  page-break-after: avoid !important;
-                  break-after: avoid !important;
-                }
-                #print-area {
-                  padding: ${(previewMode === 'kartu' || previewMode === 'batch') ? '0' : '8mm 10mm 8mm 10mm'} !important;
-                  width: 100% !important;
-                  box-sizing: border-box !important;
+                .print-batch-wrapper > .card-print-page:last-child {
+                  page-break-after: auto !important;
+                  break-after: auto !important;
                 }
                 table {
-                  page-break-inside: auto !important;
+                  page-break-inside: avoid !important;
+                  break-inside: avoid !important;
                 }
                 tr {
                   page-break-inside: avoid !important;
@@ -1279,13 +1290,20 @@ export default function KartuKendaliPage() {
               {previewMode === 'daftar' && <KopSurat />}
 
               {/* JIKA PREVIEW KARTU PERSEDIAAN TUNGGAL */}
-              {previewMode === 'kartu' && currentCard && renderCardContent(currentCard, true)}
+              {previewMode === 'kartu' && currentCard && (
+                <div className="card-print-page">
+                  {renderCardContent(currentCard, true)}
+                </div>
+              )}
 
               {/* JIKA PREVIEW CETAK SEMUA KARTU KENDALI (BATCH) */}
               {previewMode === 'batch' && (
-                <div className="space-y-8 print:space-y-0">
+                <div className="space-y-8 print:space-y-0 print-batch-wrapper">
                   {filteredAllCards.map((c) => (
-                    <div key={c.barang.id}>
+                    <div
+                      key={c.barang.id}
+                      className="card-print-page p-6 print:p-0 bg-white rounded-xl border border-dark-200 print:border-0 shadow-sm print:shadow-none"
+                    >
                       {renderCardContent(c, true)}
                     </div>
                   ))}
