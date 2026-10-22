@@ -431,10 +431,10 @@ export default function KartuKendaliPage() {
                   {c.totalPengeluaranTahunan > 0 ? c.totalPengeluaranTahunan : ''}
                 </td>
                 <td className="border border-black py-0.5 font-bold text-black bg-amber-50/20" title={`Saldo Awal 1 Januari: ${c.stock_awal_tahun}`}>
-                  {c.stock_awal_tahun}
+                  {c.stock_awal_tahun > 0 ? c.stock_awal_tahun : '-'}
                 </td>
                 <td className="border border-black py-0.5 font-extrabold text-blue-900 bg-blue-50/30" title={`Sisa Akhir 31 Desember: ${c.stock_akhir_tahun}`}>
-                  {c.stock_akhir_tahun}
+                  {c.stock_akhir_tahun > 0 ? c.stock_akhir_tahun : '-'}
                 </td>
               </tr>
             </tbody>
@@ -969,7 +969,9 @@ export default function KartuKendaliPage() {
                         <td className="text-center font-mono font-bold text-bps-blue text-[11px]">{c.kode_barang}</td>
                         <td className="font-semibold text-dark-800">{c.nama_barang}</td>
                         <td className="text-center text-dark-500 font-medium">{c.satuan}</td>
-                        <td className="text-center font-bold text-dark-700">{formatNumber(c.stock_awal_tahun)}</td>
+                        <td className="text-center font-bold text-dark-700">
+                          {c.stock_awal_tahun > 0 ? formatNumber(c.stock_awal_tahun) : '-'}
+                        </td>
                         <td className="text-center font-bold text-emerald-700 bg-emerald-50/30">
                           {c.totalMasuk > 0 ? formatNumber(c.totalMasuk) : '-'}
                         </td>
@@ -977,7 +979,7 @@ export default function KartuKendaliPage() {
                           {c.totalKeluar > 0 ? formatNumber(c.totalKeluar) : '-'}
                         </td>
                         <td className="text-center font-extrabold text-blue-900 bg-blue-50/20">
-                          {formatNumber(c.sisaAkhir)}
+                          {c.sisaAkhir > 0 ? formatNumber(c.sisaAkhir) : '-'}
                         </td>
                         <td className="text-center">
                           {hasMutasi ? (
@@ -1166,16 +1168,18 @@ export default function KartuKendaliPage() {
                       <td className="text-center text-dark-400 font-medium">{item.nomor}</td>
                       <td className="text-center font-mono font-bold text-bps-blue text-[11px]">{item.kode}</td>
                       <td className="font-semibold text-dark-800">{item.uraian}</td>
-                      <td className="text-center font-bold text-dark-700">{formatNumber(item.saldo_1_januari)}</td>
+                      <td className="text-center font-bold text-dark-700">
+                        {item.saldo_1_januari > 0 ? formatNumber(item.saldo_1_januari) : '-'}
+                      </td>
                       <td className="text-center font-bold text-emerald-700 bg-emerald-50/30">
                         {item.masuk > 0 ? formatNumber(item.masuk) : '-'}
                       </td>
                       <td className="text-center font-bold text-rose-700 bg-rose-50/30">
-                        {item.keluar > 0 ? formatNumber(item.keluar) : '0'}
+                        {item.keluar > 0 ? formatNumber(item.keluar) : '-'}
                       </td>
                       <td className="text-center text-dark-500 font-medium">{item.satuan}</td>
                       <td className="text-center font-extrabold text-blue-900 bg-blue-50/20">
-                        {formatNumber(sisa)}
+                        {sisa > 0 ? formatNumber(sisa) : '-'}
                       </td>
                       <td className="text-center">
                         <button
@@ -1355,7 +1359,7 @@ export default function KartuKendaliPage() {
                               </td>
                               <td className="border border-black px-1.5 py-0.5 text-center">{item.satuan}</td>
                               <td className="border border-black px-2 py-0.5 text-center font-bold">
-                                {formatNumber(sisa)}
+                                {sisa > 0 ? formatNumber(sisa) : '-'}
                               </td>
                             </tr>
                           );
