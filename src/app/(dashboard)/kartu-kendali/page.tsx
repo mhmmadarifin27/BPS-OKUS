@@ -214,11 +214,11 @@ export default function KartuKendaliPage() {
     const pengeluaran_bulanan = Array.from({ length: 12 }, (_, i) => getMonthlyOut(i + 1));
     const totalPengeluaranTahunan = pengeluaran_bulanan.reduce((a, b) => a + b, 0);
 
-    const LEFT_CAPACITY = 13;
+    const LEFT_CAPACITY = 24;
     const hasRight = entries.length > LEFT_CAPACITY;
     const leftEntries = entries.slice(0, LEFT_CAPACITY);
     const rightEntries = entries.slice(LEFT_CAPACITY);
-    const activeRowCount = Math.max(14, hasRight ? 1 + rightEntries.length : 14);
+    const activeRowCount = Math.max(25, hasRight ? 1 + rightEntries.length : 25);
 
     const leftTotalMasuk = leftEntries.reduce((s, e) => s + e.masuk, 0);
     const leftTotalKeluar = leftEntries.reduce((s, e) => s + e.keluar, 0);
@@ -280,8 +280,8 @@ export default function KartuKendaliPage() {
   const leftLastSisa = currentCard?.leftLastSisa || 0;
   const rightTotalMasuk = currentCard?.rightTotalMasuk || 0;
   const rightTotalKeluar = currentCard?.rightTotalKeluar || 0;
-  const activeRowCount = currentCard?.activeRowCount || 14;
-  const LEFT_CAPACITY = currentCard?.LEFT_CAPACITY || 13;
+  const activeRowCount = currentCard?.activeRowCount || 25;
+  const LEFT_CAPACITY = currentCard?.LEFT_CAPACITY || 24;
   const getMonthlyOut = currentCard?.getMonthlyOut || (() => 0);
 
   const filteredAllCards = allCardsList.filter(c => {
@@ -491,7 +491,7 @@ export default function KartuKendaliPage() {
                 const right = rIdx > 0 ? c.rightEntries[rIdx - 1] : null;
 
                 return (
-                  <tr key={rIdx} className={cn('text-black hover:bg-gray-50/50', isPrint ? 'h-[16px] print:h-[19px]' : 'h-[21px]')}>
+                  <tr key={rIdx} className={cn('text-black hover:bg-gray-50/50', isPrint ? 'h-[16px] print:h-[21px]' : 'h-[21px]')}>
                     {/* Sisi Kiri */}
                     {isPindahanRow ? (
                       <>
