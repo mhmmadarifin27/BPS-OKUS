@@ -1255,8 +1255,8 @@ export default function KartuKendaliPage() {
                 }
                 .card-print-page {
                   page-break-before: auto !important;
-                  page-break-after: always !important;
-                  break-after: page !important;
+                  page-break-after: auto !important;
+                  break-after: auto !important;
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
                   width: 100% !important;
@@ -1266,7 +1266,11 @@ export default function KartuKendaliPage() {
                   box-sizing: border-box !important;
                   display: block !important;
                 }
-                .print-batch-wrapper > .card-print-page:last-child {
+                .print-batch-wrapper > .card-print-page:not(:last-child) {
+                  page-break-after: always !important;
+                  break-after: page !important;
+                }
+                .card-print-page:last-child {
                   page-break-after: auto !important;
                   break-after: auto !important;
                 }
