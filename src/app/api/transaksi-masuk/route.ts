@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     for (const item of items) {
       const bId = item.id_barang || item.barang?.id;
       if (bId) {
-        const { data: existingB } = await supabase.from('barang').select('id, stok').eq('id', bId).maybeSingle();
+        const { data: existingB } = await supabase.from('barang').select('id, stok, id_satuan').eq('id', bId).maybeSingle();
         if (!existingB) {
           const bInfo = item.barang || {};
           const sanitized = await sanitizeBarangFK(supabase, bInfo);
@@ -48,6 +48,12 @@ export async function POST(req: Request) {
             deskripsi: bInfo.deskripsi || null,
             updated_at: new Date().toISOString(),
           });
+        } else if (item.barang?.id_satuan && existingB.id_satuan !== item.barang.id_satuan) {
+          // Sinkronkan satuan master barang bila diubah di form transaksi masuk
+          await supabase.from('barang').update({
+            id_satuan: item.barang.id_satuan,
+            updated_at: new Date().toISOString(),
+          }).eq('id', bId);
         }
         if (!primaryIdBarang) primaryIdBarang = bId;
       }
@@ -147,17 +153,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    // Perbarui stok master barang di database secara langsung
-    for (const item of items) {
-      const bId = item.id_barang || item.barang?.id;
-      const qty = Number(item.jumlah) || 0;
-      if (bId && qty > 0) {
-        const { data: bRow } = await supabase.from('barang').select('id, stok').eq('id', bId).maybeSingle();
-        if (bRow) {
-          await supabase.from('barang').update({
-            stok: (Number(bRow.stok) || 0) + qty,
-            updated_at: new Date().toISOString()
-          }).eq('id', bId);
+    // Perbarui stok master barang di database secara langsung bila transaksi baru (bukan edit)
+    if (!existingDoc) {
+      for (const item of items) {
+        const bId = item.id_barang || item.barang?.id;
+        const qty = Number(item.jumlah) || 0;
+        if (bId && qty > 0) {
+          const { data: bRow } = await supabase.from('barang').select('id, stok').eq('id', bId).maybeSingle();
+          if (bRow) {
+            await supabase.from('barang').update({
+              stok: (Number(bRow.stok) || 0) + qty,
+              updated_at: new Date().toISOString()
+            }).eq('id', bId);
+          }
         }
       }
     }

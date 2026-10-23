@@ -197,6 +197,7 @@ export interface TransaksiMasukItem {
   jumlah: number;
   harga_satuan: number | null;
   keterangan: string | null;
+  satuan?: string;
   barang?: Barang;
 }
 

@@ -15,6 +15,7 @@ import {
   deleteTransaksiMasukRemote,
   fetchAndSyncBarang,
   updateBarangStockRemote,
+  updateBarangFullRemote,
   pushBarang,
   deleteBarangRemote,
   urutkanTransaksi,
@@ -339,7 +340,7 @@ export default function TransaksiMasukPage() {
           jumlah: item.jumlah,
           keterangan: item.keterangan || '',
           is_new: false,
-          satuan: found?.satuan?.nama_satuan || item.barang?.satuan?.nama_satuan || 'Buah',
+          satuan: item.satuan || found?.satuan?.nama_satuan || item.barang?.satuan?.nama_satuan || 'Buah',
           kategori: found?.kategori?.nama_kategori || item.barang?.kategori?.nama_kategori || 'Alat Tulis Kantor',
         };
       }));
@@ -500,6 +501,23 @@ export default function TransaksiMasukPage() {
         };
         nextBarang = [matchedB, ...nextBarang];
         newBarangToPush.push(matchedB);
+      } else {
+        // Satuan bisa diedit langsung dari form transaksi masuk:
+        const satName = item.satuan || matchedB.satuan?.nama_satuan || 'Buah';
+        if (satName && satName !== matchedB.satuan?.nama_satuan) {
+          const finalSatId = findMasterId('sipersedia_satuan_list', satName) || matchedB.id_satuan || 1;
+          matchedB = {
+            ...matchedB,
+            id_satuan: finalSatId,
+            satuan: {
+              id: finalSatId,
+              nama_satuan: satName,
+              created_at: matchedB.satuan?.created_at || '',
+            },
+            updated_at: new Date().toISOString().split('T')[0],
+          };
+          nextBarang = nextBarang.map(b => b.id === matchedB!.id ? matchedB! : b);
+        }
       }
 
       return {
@@ -507,6 +525,7 @@ export default function TransaksiMasukPage() {
         jumlah: Number(item.jumlah),
         harga_satuan: null,
         keterangan: item.keterangan.trim() || null,
+        satuan: item.satuan || matchedB.satuan?.nama_satuan || 'Buah',
         barang: matchedB,
       };
     });
@@ -629,16 +648,16 @@ export default function TransaksiMasukPage() {
     // riwayat transaksinya sudah lengkap dan tidak terjadi salah hitung.
     await Promise.all([trxDiCloud, ...pushBarangTerbaru]);
 
-    // Update stok di Cloud Database hanya untuk item yang terlibat di transaksi
+    // Update stok dan detail master barang di Cloud Database untuk item yang terlibat di transaksi
     // ponytail: Hanya update item dalam transaksi, hindari n-loop ke 80+ item
-    const pembaruanStok: Promise<boolean>[] = [];
+    const pembaruanBarang: Promise<boolean>[] = [];
     preparedItems.forEach(item => {
       const bObj = nextBarang.find(b => b.id === item.id_barang);
       if (bObj) {
-        pembaruanStok.push(updateBarangStockRemote(bObj.id, bObj.stok));
+        pembaruanBarang.push(updateBarangFullRemote(bObj));
       }
     });
-    await Promise.all(pembaruanStok);
+    await Promise.all(pembaruanBarang);
 
     setBarangList(nextBarang);
     localStorage.setItem('sipersedia_barang_list', JSON.stringify(nextBarang));
@@ -1021,7 +1040,7 @@ export default function TransaksiMasukPage() {
                         ? barangList.find(b => String(b.id) === String(item.id_barang))
                         : barangList.find(b => b.nama_barang.toLowerCase().trim() === (item.nama_barang || '').toLowerCase().trim());
                       const currentStock = selectedB ? selectedB.stok : 0;
-                      const currentSatuan = selectedB?.satuan?.nama_satuan || item.satuan || 'Buah';
+                      const currentSatuan = item.satuan || selectedB?.satuan?.nama_satuan || 'Buah';
                       const isNewItem = !editItem && (item.is_new || (!selectedB && (item.nama_barang || '').trim().length > 0));
 
                       const matchingBarang = barangList
@@ -1163,59 +1182,69 @@ export default function TransaksiMasukPage() {
                             )}
                           </div>
 
-                          {/* Jika Barang Baru, Tampilkan Opsi Satuan & Kategori Inline yang Ringkas */}
-                          {isNewItem && !selectedB && (
-                            <div className="p-2.5 bg-bps-blue-50/50 border border-bps-blue-100 rounded-lg space-y-2">
-                              <div className="flex items-center justify-between text-[11px] font-bold text-bps-blue-800">
-                                <span>Informasi Tambahan Barang Baru</span>
-                                <span className="text-[10px] text-bps-blue-600">Stok Awal: 0 (Murni dari barang masuk)</span>
+                          {/* JUMLAH BARANG MASUK & SATUAN (BISA DIEDIT LANGSUNG) */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="input-label text-[11px] font-semibold text-dark-700 mb-0">
+                                  Jumlah Masuk <span className="text-red-500">*</span>
+                                </label>
                               </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="text-[10px] font-semibold text-dark-600 block mb-0.5">Satuan</label>
-                                  <select
-                                    className="input text-xs py-1 h-8"
-                                    value={item.satuan || 'Buah'}
-                                    onChange={(e) => updateFormItem(idx, 'satuan', e.target.value)}
-                                  >
-                                    {satuanOptions.map(s => <option key={s} value={s}>{s}</option>)}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="text-[10px] font-semibold text-dark-600 block mb-0.5">Kategori</label>
-                                  <select
-                                    className="input text-xs py-1 h-8"
-                                    value={item.kategori || 'Alat Tulis Kantor'}
-                                    onChange={(e) => updateFormItem(idx, 'kategori', e.target.value)}
-                                  >
-                                    {kategoriOptions.map(k => <option key={k} value={k}>{k}</option>)}
-                                  </select>
-                                </div>
+                              <input
+                                type="number"
+                                min="1"
+                                className="input text-xs font-bold w-full"
+                                value={item.jumlah}
+                                onChange={(e) => updateFormItem(idx, 'jumlah', Number(e.target.value))}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="input-label text-[11px] font-semibold text-dark-700 mb-0">
+                                  Satuan Ukuran <span className="text-red-500">*</span>
+                                </label>
                               </div>
+                              <select
+                                className="input text-xs font-semibold w-full"
+                                value={currentSatuan}
+                                onChange={(e) => updateFormItem(idx, 'satuan', e.target.value)}
+                                required
+                              >
+                                {Array.from(new Set([currentSatuan, ...satuanOptions])).filter(Boolean).map(s => (
+                                  <option key={s} value={s}>{s}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Estimasi stok / status */}
+                          {selectedB && (
+                            <div className="text-[11px] text-dark-600 bg-white/80 p-2 rounded-lg border border-dark-100 flex items-center justify-between">
+                              <span>
+                                Sisa Stok: <strong className="text-dark-800">{currentStock}</strong> {selectedB.satuan?.nama_satuan || currentSatuan} &bull; Masuk: <strong className="text-bps-blue font-bold">+{Number(item.jumlah) || 0}</strong> {currentSatuan}
+                              </span>
+                              <span className="text-emerald-600 font-bold">
+                                Total: {currentStock + (Number(item.jumlah) || 0)} {currentSatuan}
+                              </span>
                             </div>
                           )}
 
-                          {/* JUMLAH BARANG MASUK DENGAN ESTIMASI STOK LANGSUNG */}
-                          <div>
-                            <div className="flex items-center justify-between mb-1">
-                              <label className="input-label text-[11px] font-semibold text-dark-700 mb-0">
-                                Jumlah Masuk ({currentSatuan}) <span className="text-red-500">*</span>
+                          {/* Jika Barang Baru, Tampilkan Opsi Kategori */}
+                          {isNewItem && !selectedB && (
+                            <div>
+                              <label className="text-[10px] font-semibold text-dark-600 block mb-1">
+                                Kategori Barang Baru <span className="text-red-500">*</span>
                               </label>
-                              {!editItem && selectedB && !isNewItem && (
-                                <span className="text-[11px] text-dark-500">
-                                  Sisa Stok: <strong className="text-dark-800">{currentStock}</strong> + Masuk: <strong className="text-bps-blue font-bold">{Number(item.jumlah) || 0}</strong> = Estimasi: <strong className="text-emerald-600 font-bold">{currentStock + (Number(item.jumlah) || 0)} {currentSatuan}</strong>
-                                </span>
-                              )}
+                              <select
+                                className="input text-xs py-1 h-8 w-full"
+                                value={item.kategori || 'Alat Tulis Kantor'}
+                                onChange={(e) => updateFormItem(idx, 'kategori', e.target.value)}
+                              >
+                                {kategoriOptions.map(k => <option key={k} value={k}>{k}</option>)}
+                              </select>
                             </div>
-                            <input
-                              type="number"
-                              min="1"
-                              className="input text-xs font-bold w-full"
-                              value={item.jumlah}
-                              onChange={(e) => updateFormItem(idx, 'jumlah', Number(e.target.value))}
-                              required
-                            />
-                          </div>
+                          )}
 
                           <div>
                             <input
