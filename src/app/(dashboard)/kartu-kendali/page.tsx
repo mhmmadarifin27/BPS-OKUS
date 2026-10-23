@@ -214,11 +214,11 @@ export default function KartuKendaliPage() {
     const pengeluaran_bulanan = Array.from({ length: 12 }, (_, i) => getMonthlyOut(i + 1));
     const totalPengeluaranTahunan = pengeluaran_bulanan.reduce((a, b) => a + b, 0);
 
-    const LEFT_CAPACITY = 24;
+    const LEFT_CAPACITY = 25;
     const hasRight = entries.length > LEFT_CAPACITY;
     const leftEntries = entries.slice(0, LEFT_CAPACITY);
     const rightEntries = entries.slice(LEFT_CAPACITY);
-    const activeRowCount = Math.max(25, hasRight ? 1 + rightEntries.length : 25);
+    const activeRowCount = Math.max(26, hasRight ? 1 + rightEntries.length : 26);
 
     const leftTotalMasuk = leftEntries.reduce((s, e) => s + e.masuk, 0);
     const leftTotalKeluar = leftEntries.reduce((s, e) => s + e.keluar, 0);
@@ -280,8 +280,8 @@ export default function KartuKendaliPage() {
   const leftLastSisa = currentCard?.leftLastSisa || 0;
   const rightTotalMasuk = currentCard?.rightTotalMasuk || 0;
   const rightTotalKeluar = currentCard?.rightTotalKeluar || 0;
-  const activeRowCount = currentCard?.activeRowCount || 25;
-  const LEFT_CAPACITY = currentCard?.LEFT_CAPACITY || 24;
+  const activeRowCount = currentCard?.activeRowCount || 26;
+  const LEFT_CAPACITY = currentCard?.LEFT_CAPACITY || 25;
   const getMonthlyOut = currentCard?.getMonthlyOut || (() => 0);
 
   const filteredAllCards = allCardsList.filter(c => {
@@ -1228,12 +1228,12 @@ export default function KartuKendaliPage() {
             <style dangerouslySetInnerHTML={{ __html: `
               @page {
                 size: ${(previewMode === 'kartu' || previewMode === 'batch') ? 'A4 landscape' : 'A4 portrait'};
-                margin: ${(previewMode === 'kartu' || previewMode === 'batch') ? '5mm 8mm 5mm 8mm' : '8mm 10mm 8mm 10mm'};
+                margin: 0 !important;
               }
               @media print {
                 @page {
                   size: ${(previewMode === 'kartu' || previewMode === 'batch') ? 'A4 landscape' : 'A4 portrait'};
-                  margin: ${(previewMode === 'kartu' || previewMode === 'batch') ? '5mm 8mm 5mm 8mm' : '8mm 10mm 8mm 10mm'};
+                  margin: 0 !important;
                 }
                 html, body {
                   margin: 0 !important;
@@ -1244,7 +1244,7 @@ export default function KartuKendaliPage() {
                   width: 100% !important;
                 }
                 #print-area {
-                  padding: 0 !important;
+                  padding: ${(previewMode === 'daftar') ? '8mm 10mm 8mm 10mm !important' : '0 !important'};
                   margin: 0 !important;
                   width: 100% !important;
                 }
@@ -1262,7 +1262,7 @@ export default function KartuKendaliPage() {
                   width: 100% !important;
                   max-width: 100% !important;
                   margin: 0 !important;
-                  padding: 0 !important;
+                  padding: 5mm 8mm 5mm 8mm !important;
                   box-sizing: border-box !important;
                   display: block !important;
                 }
@@ -1306,7 +1306,7 @@ export default function KartuKendaliPage() {
                   {filteredAllCards.map((c) => (
                     <div
                       key={c.barang.id}
-                      className="card-print-page p-6 print:p-0 bg-white rounded-xl border border-dark-200 print:border-0 shadow-sm print:shadow-none"
+                      className="card-print-page p-6 bg-white rounded-xl border border-dark-200 print:border-0 shadow-sm print:shadow-none"
                     >
                       {renderCardContent(c, true)}
                     </div>
