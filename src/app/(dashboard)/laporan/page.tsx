@@ -706,15 +706,15 @@ export default function LaporanPage() {
 
             <style dangerouslySetInnerHTML={{
               __html: `
-              /* Margin 0 mutlak untuk menghapus header & footer tanggal, URL, dan nomor halaman bawaan browser */
+              /* Margin cetak proporsional A4: halaman 2 dan seterusnya tidak mepet ke tepi atas kertas */
               @page {
                 size: A4 portrait;
-                margin: 0; 
+                margin: 10mm 10mm 10mm 10mm; 
               }
               @media print {
                 @page {
                   size: A4 portrait;
-                  margin: 0;
+                  margin: 10mm 10mm 10mm 10mm;
                 }
                 .no-print,
                 .print\\:hidden,
@@ -736,7 +736,7 @@ export default function LaporanPage() {
                   break-inside: avoid !important;
                 }
                 #print-area {
-                  padding: 10mm 10mm 10mm 10mm !important; 
+                  padding: 0 !important; 
                   margin: 0 !important;
                   width: 100% !important;
                   display: block !important; 
@@ -748,25 +748,6 @@ export default function LaporanPage() {
                 thead {
                   display: table-header-group !important;
                 }
-                /* Baris spacer di thead: memberi jeda/jarak bersih 10mm dari tepi atas kertas di halaman 2+ */
-                tr.print-spacer-row {
-                  display: table-row !important;
-                  height: 10mm !important;
-                  border: none !important;
-                  background: transparent !important;
-                }
-                tr.print-spacer-row th,
-                tr.print-spacer-row td {
-                  height: 10mm !important;
-                  border: none !important;
-                  border-top: none !important;
-                  border-bottom: none !important;
-                  border-left: none !important;
-                  border-right: none !important;
-                  padding: 0 !important;
-                  margin: 0 !important;
-                  background: transparent !important;
-                }
                 tr {
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
@@ -775,7 +756,6 @@ export default function LaporanPage() {
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
                   margin-top: 16px !important;
-                  margin-bottom: 10mm !important;
                 }
               }
             `}} />
@@ -804,10 +784,6 @@ export default function LaporanPage() {
                   className={cn("w-full border-collapse border border-black text-[9px] print:text-[8pt] mb-4 print:mb-3", printTableFontSize)}
                 >
                   <thead>
-                    {/* Baris spacer invisible saat print: menjaga jarak 10mm dari tepi atas kertas di halaman lanjutan */}
-                    <tr className="print-spacer-row hidden print:table-row">
-                      <th colSpan={10} className="border-0 p-0 bg-transparent" />
-                    </tr>
                     <tr className="bg-gray-100 text-black font-bold text-center leading-tight">
                       <th style={{ width: '4%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">No.</th>
                       <th style={{ width: '26%', overflow: 'hidden' }} className="border border-black px-1.5 py-1.5 text-center">Uraian Barang</th>
@@ -859,10 +835,6 @@ export default function LaporanPage() {
                   className={cn("w-full border-collapse border border-black text-[9px] print:text-[8pt] mb-4 print:mb-3", printTableFontSize)}
                 >
                   <thead>
-                    {/* Baris spacer invisible saat print: menjaga jarak 10mm dari tepi atas kertas di halaman lanjutan */}
-                    <tr className="print-spacer-row hidden print:table-row">
-                      <th colSpan={12} className="border-0 p-0 bg-transparent" />
-                    </tr>
                     <tr className="bg-gray-100 text-black font-bold text-center leading-tight">
                       <th rowSpan={2} style={{ width: '3.5%' }} className="border border-black px-1 py-1">No.</th>
                       <th rowSpan={2} style={{ width: '23.5%' }} className="border border-black px-1.5 py-1 text-center">Uraian Barang</th>
