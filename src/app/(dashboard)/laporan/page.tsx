@@ -736,14 +736,24 @@ export default function LaporanPage() {
                   break-inside: avoid !important;
                 }
                 #print-area {
-                  padding: 0 !important; 
+                  padding: 0 1.5mm !important; 
                   margin: 0 !important;
                   width: 100% !important;
                   display: block !important; 
                   box-sizing: border-box !important;
                 }
                 table {
+                  width: 100% !important;
+                  border-collapse: collapse !important;
+                  border: 1px solid #000000 !important;
                   page-break-inside: auto !important;
+                }
+                th, td {
+                  border: 1px solid #000000 !important;
+                }
+                th:last-child,
+                td:last-child {
+                  border-right: 1px solid #000000 !important;
                 }
                 thead {
                   display: table-header-group !important;
