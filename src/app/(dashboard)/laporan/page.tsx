@@ -709,12 +709,12 @@ export default function LaporanPage() {
               /* Margin cetak proporsional A4: halaman 2 dan seterusnya tidak mepet ke tepi atas kertas */
               @page {
                 size: A4 portrait;
-                margin: 10mm 10mm 10mm 10mm; 
+                margin: 8mm 10mm 8mm 10mm; 
               }
               @media print {
                 @page {
                   size: A4 portrait;
-                  margin: 10mm 10mm 10mm 10mm;
+                  margin: 8mm 10mm 8mm 10mm;
                 }
                 .no-print,
                 .print\\:hidden,
@@ -750,6 +750,9 @@ export default function LaporanPage() {
                 }
                 th, td {
                   border: 1px solid #000000 !important;
+                  padding-top: 1.5px !important;
+                  padding-bottom: 1.5px !important;
+                  line-height: 1.15 !important;
                 }
                 th:last-child,
                 td:last-child {
@@ -765,7 +768,14 @@ export default function LaporanPage() {
                 .signature-block {
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
-                  margin-top: 16px !important;
+                  margin-top: 10px !important;
+                  font-size: 9pt !important;
+                  line-height: 1.25 !important;
+                }
+                .signature-block .sig-space {
+                  height: 38px !important;
+                  min-height: 38px !important;
+                  max-height: 38px !important;
                 }
               }
             `}} />
