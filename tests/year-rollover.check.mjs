@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 
 // Self-check for dynamic years and multi-year inventory rollover logic
-function getAvailableYears(additionalDates = []) {
+function getAvailableYears(additionalDates = [], customYears = []) {
   const startYear = 2025;
   const currentYear = new Date().getFullYear();
   const dateYears = additionalDates
@@ -12,12 +12,15 @@ function getAvailableYears(additionalDates = []) {
       return p.length >= 1 ? parseInt(p[0], 10) : new Date(d).getFullYear();
     })
     .filter(y => !isNaN(y) && y >= 2000 && y <= 2100);
-  const endYear = Math.max(currentYear + 4, 2030, ...dateYears);
-  const years = [];
+  const endYear = Math.max(currentYear + 10, 2035, ...dateYears, ...customYears);
+  const yearSet = new Set();
   for (let y = startYear; y <= endYear; y++) {
-    years.push(y);
+    yearSet.add(y);
   }
-  return years;
+  customYears.forEach(y => {
+    if (y >= startYear) yearSet.add(y);
+  });
+  return Array.from(yearSet).sort((a, b) => a - b);
 }
 
 // 1. Check dynamic years generation
@@ -26,11 +29,16 @@ assert(years.includes(2025), 'Must include 2025');
 assert(years.includes(2026), 'Must include 2026');
 assert(years.includes(2027), 'Must include 2027');
 assert(years.includes(2030), 'Must include 2030');
+assert(years.includes(2035), 'Must include 2035');
 assert(years[0] === 2025, 'First year is 2025');
 
 // 1b. Check extra future year detection
-const futureYears = getAvailableYears(['2033-05-10']);
-assert(futureYears.includes(2033), 'Must automatically expand to 2033');
+const futureYears = getAvailableYears(['2038-05-10']);
+assert(futureYears.includes(2038), 'Must automatically expand to 2038');
+
+// 1c. Check manual custom year addition
+const withCustom = getAvailableYears([], [2042]);
+assert(withCustom.includes(2042), 'Must include custom year 2042');
 
 // 2. Check year rollover calculation logic
 function calculateStockForYear(selectedYear, targetBarangId, txMasuk, txKeluar) {

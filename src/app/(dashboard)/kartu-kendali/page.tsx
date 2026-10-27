@@ -10,7 +10,7 @@ import {
 import { mockKartuKendali, mockBarang, mockTransaksiKeluar, mockTransaksiMasuk } from '@/lib/mock-data';
 import { TIM_PEMOHON_LIST, getStoredTimList, formatNamaPJ, TimPemohon } from '@/types';
 import type { KartuKendali, Barang, TransaksiKeluar, TransaksiMasuk } from '@/types';
-import { cn, formatDateShort, formatNumber, getAvailableYears } from '@/lib/utils';
+import { cn, formatDateShort, formatNumber, getAvailableYears, getStoredCustomYears, saveCustomYear } from '@/lib/utils';
 import KopSurat from '@/components/KopSurat';
 import {
   fetchAndSyncBarang,
@@ -32,6 +32,13 @@ export default function KartuKendaliPage() {
   const [previewMode, setPreviewMode] = useState<'kartu' | 'katalog' | 'daftar' | 'batch'>('kartu');
   const [filterKategori, setFilterKategori] = useState<string>('all');
   const [filterMutasiOnly, setFilterMutasiOnly] = useState<boolean>(false);
+  const [customYears, setCustomYears] = useState<number[]>(() => {
+    if (typeof window !== 'undefined') return getStoredCustomYears();
+    return [];
+  });
+  const [showAddYearModal, setShowAddYearModal] = useState(false);
+  const [inputCustomYear, setInputCustomYear] = useState<string>('');
+  const [customYearError, setCustomYearError] = useState<string>('');
 
   // === State Form Input Mutasi Langsung ===
   const [showInputModal, setShowInputModal] = useState(false);
@@ -117,12 +124,19 @@ export default function KartuKendaliPage() {
     const handleTimUpdate = () => {
       setTimList(getStoredTimList());
     };
+    const handleCustomYears = () => {
+      setCustomYears(getStoredCustomYears());
+    };
     window.addEventListener('timListUpdated', handleTimUpdate);
     window.addEventListener('storage', handleTimUpdate);
+    window.addEventListener('customYearsUpdated', handleCustomYears);
+    window.addEventListener('storage', handleCustomYears);
 
     return () => {
       window.removeEventListener('timListUpdated', handleTimUpdate);
       window.removeEventListener('storage', handleTimUpdate);
+      window.removeEventListener('customYearsUpdated', handleCustomYears);
+      window.removeEventListener('storage', handleCustomYears);
     };
   }, [refreshKey]);
 
@@ -326,10 +340,38 @@ export default function KartuKendaliPage() {
     return matchSearch && matchMutasi && matchKategori;
   });
 
-  const availableYears = getAvailableYears([
-    ...transaksiMasukList.map(t => t.tanggal),
-    ...transaksiKeluarList.map(t => t.tanggal),
-  ]);
+  const availableYears = getAvailableYears(
+    [
+      ...transaksiMasukList.map(t => t.tanggal),
+      ...transaksiKeluarList.map(t => t.tanggal),
+    ],
+    customYears
+  );
+
+  const handleSelectYearOption = (val: string) => {
+    if (val === 'custom') {
+      setInputCustomYear('');
+      setCustomYearError('');
+      setShowAddYearModal(true);
+    } else {
+      setSelectedYear(Number(val));
+    }
+  };
+
+  const handleSaveCustomYear = (e: React.FormEvent) => {
+    e.preventDefault();
+    const yr = parseInt(inputCustomYear.trim(), 10);
+    if (isNaN(yr) || yr < 2020 || yr > 2099) {
+      setCustomYearError('Masukkan 4 digit tahun valid (2020 - 2099)');
+      return;
+    }
+    saveCustomYear(yr);
+    setCustomYears(prev => Array.from(new Set([...prev, yr])).sort((a, b) => a - b));
+    setSelectedYear(yr);
+    setShowAddYearModal(false);
+    setNotification({ type: 'success', message: `✅ Tahun Anggaran ${yr} berhasil ditambahkan dan dipilih!` });
+    setTimeout(() => setNotification(null), 3000);
+  };
 
   // Handler cetak dokumen bersih (tanpa tulisan SIPERSEDIA di header browser)
   const handlePrint = () => {
@@ -874,7 +916,7 @@ export default function KartuKendaliPage() {
             <Calendar className="w-4 h-4 text-dark-400 ml-2" />
             <select
               value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              onChange={(e) => handleSelectYearOption(e.target.value)}
               className="text-xs font-bold text-dark-700 bg-transparent py-1 pr-3 focus:outline-none cursor-pointer"
             >
               {availableYears.map(y => (
@@ -882,6 +924,9 @@ export default function KartuKendaliPage() {
                   Tahun Anggaran {y}{y === 2025 ? ' (PDF 1)' : y === 2026 ? ' (PDF 2)' : ''}
                 </option>
               ))}
+              <option value="custom" className="font-bold text-bps-blue">
+                + Tambah Tahun Lain...
+              </option>
             </select>
           </div>
 
@@ -1623,6 +1668,63 @@ export default function KartuKendaliPage() {
                   className="px-4 py-2.5 rounded-xl text-sm font-semibold text-dark-600 bg-dark-100 hover:bg-dark-200 transition-colors"
                 >
                   Batal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Tambah Tahun Baru */}
+      {showAddYearModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 animate-slide-in-up">
+            <div className="flex items-center justify-between pb-3 border-b border-dark-100">
+              <h3 className="font-bold text-dark-800 text-sm">Tambah Tahun Anggaran</h3>
+              <button
+                type="button"
+                onClick={() => setShowAddYearModal(false)}
+                className="text-dark-400 hover:text-dark-700 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveCustomYear} className="mt-4 space-y-4">
+              <div>
+                <label className="input-label text-xs">Masukkan Angka Tahun</label>
+                <input
+                  type="number"
+                  min="2020"
+                  max="2099"
+                  value={inputCustomYear}
+                  onChange={(e) => {
+                    setInputCustomYear(e.target.value);
+                    setCustomYearError('');
+                  }}
+                  placeholder="Contoh: 2038"
+                  className="input w-full font-bold text-center text-lg py-2 text-bps-blue"
+                  autoFocus
+                  required
+                />
+                {customYearError && (
+                  <p className="text-[11px] text-rose-600 mt-1 font-medium">{customYearError}</p>
+                )}
+                <p className="text-[11px] text-dark-400 mt-1.5">
+                  Tahun ini akan otomatis tersimpan di daftar pilihan Kartu Kendali &amp; Laporan.
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddYearModal(false)}
+                  className="btn-secondary text-xs py-2 px-3"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary text-xs py-2 px-4 font-bold"
+                >
+                  Simpan &amp; Terapkan
                 </button>
               </div>
             </form>

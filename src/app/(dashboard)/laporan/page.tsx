@@ -8,7 +8,7 @@ import {
 import { type RekapitulasiAgustusItem } from '@/lib/data-rekapitulasi-agustus';
 import { mockBarang, mockTransaksiMasuk, mockTransaksiKeluar } from '@/lib/mock-data';
 import type { Barang, TransaksiMasuk, TransaksiKeluar } from '@/types';
-import { cn, formatNumber, getMonthName, getTeksBeritaAcaraOpname, formatTanggalTandaTangan, getAvailableYears } from '@/lib/utils';
+import { cn, formatNumber, getMonthName, getTeksBeritaAcaraOpname, formatTanggalTandaTangan, getAvailableYears, getStoredCustomYears, saveCustomYear } from '@/lib/utils';
 import KopSurat from '@/components/KopSurat';
 import {
   fetchAndSyncBarang,
@@ -23,6 +23,14 @@ export default function LaporanPage() {
   const [activeTab, setActiveTab] = useState<'opname' | 'tim'>('opname');
   const [showPreview, setShowPreview] = useState(false);
   const [toastNotification, setToastNotification] = useState<string | null>(null);
+  const [customYears, setCustomYears] = useState<number[]>(() => {
+    if (typeof window !== 'undefined') return getStoredCustomYears();
+    return [];
+  });
+  const [showAddYearModal, setShowAddYearModal] = useState(false);
+  const [inputCustomYear, setInputCustomYear] = useState<string>('');
+  const [customYearError, setCustomYearError] = useState<string>('');
+
   // Tanggal Cetak Dinamis - default hari ini, bisa disesuaikan
   const [tglCetakDokumen, setTglCetakDokumen] = useState(() => new Date().toISOString().split('T')[0]);
 
@@ -88,6 +96,17 @@ export default function LaporanPage() {
     fetchAndSyncTransaksiMasuk(curBarang).then((mData) => {
       if (mData) setTransaksiMasukList(mData);
     });
+
+    const handleCustomYears = () => {
+      setCustomYears(getStoredCustomYears());
+    };
+    window.addEventListener('customYearsUpdated', handleCustomYears);
+    window.addEventListener('storage', handleCustomYears);
+
+    return () => {
+      window.removeEventListener('customYearsUpdated', handleCustomYears);
+      window.removeEventListener('storage', handleCustomYears);
+    };
   }, []);
 
   // Hitung Data Rekapitulasi secara real-time dari mutasi transaksi aktif
@@ -270,10 +289,38 @@ export default function LaporanPage() {
     setTglCetakDokumen(`${newTahun}-${String(bulan).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`);
   };
 
-  const availableYears = getAvailableYears([
-    ...transaksiMasukList.map(t => t.tanggal),
-    ...transaksiKeluarList.map(t => t.tanggal),
-  ]);
+  const availableYears = getAvailableYears(
+    [
+      ...transaksiMasukList.map(t => t.tanggal),
+      ...transaksiKeluarList.map(t => t.tanggal),
+    ],
+    customYears
+  );
+
+  const handleSelectYearOption = (val: string) => {
+    if (val === 'custom') {
+      setInputCustomYear('');
+      setCustomYearError('');
+      setShowAddYearModal(true);
+    } else {
+      handleTahunChange(Number(val));
+    }
+  };
+
+  const handleSaveCustomYear = (e: React.FormEvent) => {
+    e.preventDefault();
+    const yr = parseInt(inputCustomYear.trim(), 10);
+    if (isNaN(yr) || yr < 2020 || yr > 2099) {
+      setCustomYearError('Masukkan 4 digit tahun valid (2020 - 2099)');
+      return;
+    }
+    saveCustomYear(yr);
+    setCustomYears(prev => Array.from(new Set([...prev, yr])).sort((a, b) => a - b));
+    handleTahunChange(yr);
+    setShowAddYearModal(false);
+    setToastNotification(`Tahun ${yr} berhasil ditambahkan dan dipilih!`);
+    setTimeout(() => setToastNotification(null), 3000);
+  };
 
   // STRICT FILTER: Barang yang total persediaannya 0 (habis) dihilangkan dari laporan & nomor urut berurutan runtut
   const activeReportData = reportData
@@ -361,10 +408,17 @@ export default function LaporanPage() {
               </div>
               <div>
                 <label className="input-label">Tahun</label>
-                <select value={tahun} onChange={(e) => handleTahunChange(Number(e.target.value))} className="input w-32 font-semibold">
+                <select
+                  value={tahun}
+                  onChange={(e) => handleSelectYearOption(e.target.value)}
+                  className="input w-36 font-semibold"
+                >
                   {availableYears.map(y => (
                     <option key={y} value={y}>{y}</option>
                   ))}
+                  <option value="custom" className="font-bold text-bps-blue">
+                    + Tambah Tahun Lain...
+                  </option>
                 </select>
               </div>
               <button
@@ -834,6 +888,64 @@ export default function LaporanPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Tambah Tahun Baru */}
+      {showAddYearModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 animate-slide-in-up">
+            <div className="flex items-center justify-between pb-3 border-b border-dark-100">
+              <h3 className="font-bold text-dark-800 text-sm">Tambah Tahun Laporan</h3>
+              <button
+                type="button"
+                onClick={() => setShowAddYearModal(false)}
+                className="text-dark-400 hover:text-dark-700 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveCustomYear} className="mt-4 space-y-4">
+              <div>
+                <label className="input-label text-xs">Masukkan Angka Tahun</label>
+                <input
+                  type="number"
+                  min="2020"
+                  max="2099"
+                  value={inputCustomYear}
+                  onChange={(e) => {
+                    setInputCustomYear(e.target.value);
+                    setCustomYearError('');
+                  }}
+                  placeholder="Contoh: 2038"
+                  className="input w-full font-bold text-center text-lg py-2 text-bps-blue"
+                  autoFocus
+                  required
+                />
+                {customYearError && (
+                  <p className="text-[11px] text-rose-600 mt-1 font-medium">{customYearError}</p>
+                )}
+                <p className="text-[11px] text-dark-400 mt-1.5">
+                  Tahun ini akan otomatis tersimpan di daftar pilihan dan langsung diterapkan.
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddYearModal(false)}
+                  className="btn-secondary text-xs py-2 px-3"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary text-xs py-2 px-4 font-bold"
+                >
+                  Simpan &amp; Terapkan
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

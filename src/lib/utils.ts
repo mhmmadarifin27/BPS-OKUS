@@ -93,7 +93,33 @@ export function formatTanggalTandaTangan(d: Date | string = new Date()): string 
   return `Muaradua, ${date.getDate()} ${getMonthName(date.getMonth() + 1)} ${date.getFullYear()}`;
 }
 
-export function getAvailableYears(additionalDates: string[] = []): number[] {
+export function getStoredCustomYears(): number[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('sipersedia_custom_years');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map(Number).filter(y => !isNaN(y) && y >= 2000 && y <= 2100);
+      }
+    }
+  } catch {}
+  return [];
+}
+
+export function saveCustomYear(year: number): number[] {
+  if (typeof window === 'undefined') return [];
+  const existing = getStoredCustomYears();
+  if (!existing.includes(year) && year >= 2000 && year <= 2100) {
+    const updated = [...existing, year].sort((a, b) => a - b);
+    localStorage.setItem('sipersedia_custom_years', JSON.stringify(updated));
+    window.dispatchEvent(new Event('customYearsUpdated'));
+    return updated;
+  }
+  return existing;
+}
+
+export function getAvailableYears(additionalDates: string[] = [], customYears: number[] = []): number[] {
   const startYear = 2025;
   const currentYear = new Date().getFullYear();
   const dateYears = additionalDates
@@ -104,11 +130,14 @@ export function getAvailableYears(additionalDates: string[] = []): number[] {
       return p.length >= 1 ? parseInt(p[0], 10) : new Date(d).getFullYear();
     })
     .filter(y => !isNaN(y) && y >= 2000 && y <= 2100);
-  const endYear = Math.max(currentYear + 4, 2030, ...dateYears);
-  const years: number[] = [];
+  const endYear = Math.max(currentYear + 10, 2035, ...dateYears, ...customYears);
+  const yearSet = new Set<number>();
   for (let y = startYear; y <= endYear; y++) {
-    years.push(y);
+    yearSet.add(y);
   }
-  return years;
+  customYears.forEach(y => {
+    if (y >= startYear) yearSet.add(y);
+  });
+  return Array.from(yearSet).sort((a, b) => a - b);
 }
 
