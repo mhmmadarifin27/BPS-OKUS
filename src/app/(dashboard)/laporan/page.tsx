@@ -706,15 +706,15 @@ export default function LaporanPage() {
 
             <style dangerouslySetInnerHTML={{
               __html: `
-              /* Margin cetak proporsional A4: halaman 2 dan seterusnya tidak mepet ke tepi atas kertas */
+              /* Margin 0 menghilangkan otomatis URL, tanggal, dan nomor halaman browser */
               @page {
                 size: A4 portrait;
-                margin: 10mm 10mm 10mm 10mm; 
+                margin: 0; 
               }
               @media print {
                 @page {
                   size: A4 portrait;
-                  margin: 10mm 10mm 10mm 10mm;
+                  margin: 0;
                 }
                 .no-print,
                 .print\\:hidden,
@@ -736,7 +736,7 @@ export default function LaporanPage() {
                   break-inside: avoid !important;
                 }
                 #print-area {
-                  padding: 0 !important; 
+                  padding: 6mm 8mm 6mm 8mm !important; 
                   margin: 0 !important;
                   width: 100% !important;
                   display: block !important; 
@@ -748,6 +748,15 @@ export default function LaporanPage() {
                 thead {
                   display: table-header-group !important;
                 }
+                tr.print-spacer,
+                tr.print-spacer th,
+                tr.print-spacer td {
+                  border: none !important;
+                  height: 6mm !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
+                  background: transparent !important;
+                }
                 tr {
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
@@ -755,7 +764,7 @@ export default function LaporanPage() {
                 .signature-block {
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
-                  margin-top: 16px !important;
+                  margin-top: 14px !important;
                 }
               }
             `}} />
@@ -784,6 +793,9 @@ export default function LaporanPage() {
                   className={cn("w-full border-collapse border border-black text-[9px] print:text-[8pt] mb-4 print:mb-3", printTableFontSize)}
                 >
                   <thead>
+                    <tr className="hidden print:table-row print-spacer">
+                      <th colSpan={10} className="border-0 p-0 m-0" style={{ border: 'none', background: 'transparent' }} />
+                    </tr>
                     <tr className="bg-gray-100 text-black font-bold text-center leading-tight">
                       <th style={{ width: '4%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">No.</th>
                       <th style={{ width: '26%', overflow: 'hidden' }} className="border border-black px-1.5 py-1.5 text-center">Uraian Barang</th>
@@ -835,6 +847,9 @@ export default function LaporanPage() {
                   className={cn("w-full border-collapse border border-black text-[9px] print:text-[8pt] mb-4 print:mb-3", printTableFontSize)}
                 >
                   <thead>
+                    <tr className="hidden print:table-row print-spacer">
+                      <th colSpan={12} className="border-0 p-0 m-0" style={{ border: 'none', background: 'transparent' }} />
+                    </tr>
                     <tr className="bg-gray-100 text-black font-bold text-center leading-tight">
                       <th rowSpan={2} style={{ width: '3.5%' }} className="border border-black px-1 py-1">No.</th>
                       <th rowSpan={2} style={{ width: '23.5%' }} className="border border-black px-1.5 py-1 text-center">Uraian Barang</th>
