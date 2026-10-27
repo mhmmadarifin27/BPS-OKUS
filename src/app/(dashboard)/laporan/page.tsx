@@ -8,7 +8,7 @@ import {
 import { type RekapitulasiAgustusItem } from '@/lib/data-rekapitulasi-agustus';
 import { mockBarang, mockTransaksiMasuk, mockTransaksiKeluar } from '@/lib/mock-data';
 import type { Barang, TransaksiMasuk, TransaksiKeluar } from '@/types';
-import { cn, formatNumber, getMonthName, getTeksBeritaAcaraOpname, formatTanggalTandaTangan } from '@/lib/utils';
+import { cn, formatNumber, getMonthName, getTeksBeritaAcaraOpname, formatTanggalTandaTangan, getAvailableYears } from '@/lib/utils';
 import KopSurat from '@/components/KopSurat';
 import {
   fetchAndSyncBarang,
@@ -212,7 +212,8 @@ export default function LaporanPage() {
         }
       });
 
-      const saldoAwal = Math.max(0, masukSebelum - keluarSebelum);
+      const baseStokAwal = Number((b as any)?.stok_awal) || 0;
+      const saldoAwal = Math.max(0, baseStokAwal + masukSebelum - keluarSebelum);
       const curMutasi = getMonthMutasi(targetBulan, targetTahun);
       const pembelian = curMutasi.beli;
       const transferMasuk = curMutasi.transfer;
@@ -268,6 +269,11 @@ export default function LaporanPage() {
     const lastDay = new Date(newTahun, bulan, 0).getDate();
     setTglCetakDokumen(`${newTahun}-${String(bulan).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`);
   };
+
+  const availableYears = getAvailableYears([
+    ...transaksiMasukList.map(t => t.tanggal),
+    ...transaksiKeluarList.map(t => t.tanggal),
+  ]);
 
   // STRICT FILTER: Barang yang total persediaannya 0 (habis) dihilangkan dari laporan & nomor urut berurutan runtut
   const activeReportData = reportData
@@ -356,7 +362,7 @@ export default function LaporanPage() {
               <div>
                 <label className="input-label">Tahun</label>
                 <select value={tahun} onChange={(e) => handleTahunChange(Number(e.target.value))} className="input w-32 font-semibold">
-                  {[2025, 2026, 2027].map(y => (
+                  {availableYears.map(y => (
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>

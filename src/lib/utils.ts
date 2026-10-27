@@ -93,3 +93,22 @@ export function formatTanggalTandaTangan(d: Date | string = new Date()): string 
   return `Muaradua, ${date.getDate()} ${getMonthName(date.getMonth() + 1)} ${date.getFullYear()}`;
 }
 
+export function getAvailableYears(additionalDates: string[] = []): number[] {
+  const startYear = 2025;
+  const currentYear = new Date().getFullYear();
+  const dateYears = additionalDates
+    .map(d => {
+      if (!d) return NaN;
+      const clean = d.split('T')[0];
+      const p = clean.split('-');
+      return p.length >= 1 ? parseInt(p[0], 10) : new Date(d).getFullYear();
+    })
+    .filter(y => !isNaN(y) && y >= 2000 && y <= 2100);
+  const endYear = Math.max(currentYear + 4, 2030, ...dateYears);
+  const years: number[] = [];
+  for (let y = startYear; y <= endYear; y++) {
+    years.push(y);
+  }
+  return years;
+}
+

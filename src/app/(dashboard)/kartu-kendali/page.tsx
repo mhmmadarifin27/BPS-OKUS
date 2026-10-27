@@ -10,7 +10,7 @@ import {
 import { mockKartuKendali, mockBarang, mockTransaksiKeluar, mockTransaksiMasuk } from '@/lib/mock-data';
 import { TIM_PEMOHON_LIST, getStoredTimList, formatNamaPJ, TimPemohon } from '@/types';
 import type { KartuKendali, Barang, TransaksiKeluar, TransaksiMasuk } from '@/types';
-import { cn, formatDateShort, formatNumber } from '@/lib/utils';
+import { cn, formatDateShort, formatNumber, getAvailableYears } from '@/lib/utils';
 import KopSurat from '@/components/KopSurat';
 import {
   fetchAndSyncBarang,
@@ -128,9 +128,6 @@ export default function KartuKendaliPage() {
 
   // Helper fungsi untuk menghitung kartu kendali lengkap bagi barang tertentu
   const computeSingleCard = (targetBarang: Barang) => {
-    // ponytail: Sistem dimulai resmi dari Oktober 2026, saldo awal sebelum pembukuan adalah 0
-    const stockAwal = (targetBarang as any)?.stok_awal ?? 0;
-
     const isMatch = (i: any) => {
       if (!i) return false;
       if (String(i.id_barang) === String(targetBarang.id)) return true;
@@ -139,10 +136,47 @@ export default function KartuKendaliPage() {
       return false;
     };
 
+    const getYearFromDate = (tgl: string): number => {
+      if (!tgl) return NaN;
+      const clean = tgl.split('T')[0];
+      const p = clean.split('-');
+      if (p.length >= 1) {
+        const yr = parseInt(p[0], 10);
+        if (!isNaN(yr)) return yr;
+      }
+      const d = new Date(tgl);
+      return isNaN(d.getTime()) ? NaN : d.getFullYear();
+    };
+
+    // ponytail: Saldo awal tahun berjalan berasal dari sisa kumulatif transaksi tahun sebelumnya
+    let masukSebelumTahun = 0;
+    transaksiMasukList.forEach(t => {
+      const yr = getYearFromDate(t.tanggal);
+      if (!isNaN(yr) && yr < selectedYear) {
+        t.items?.forEach(itm => {
+          if (isMatch(itm)) masukSebelumTahun += Number(itm.jumlah) || 0;
+        });
+      }
+    });
+
+    let keluarSebelumTahun = 0;
+    transaksiKeluarList.forEach(t => {
+      if (t.status === 'pending' || t.status === 'rejected') return;
+      const yr = getYearFromDate(t.tanggal);
+      if (!isNaN(yr) && yr < selectedYear) {
+        t.items?.forEach(itm => {
+          if (isMatch(itm)) keluarSebelumTahun += Number(itm.jumlah) || 0;
+        });
+      }
+    });
+
+    const baseStokAwal = Number((targetBarang as any)?.stok_awal) || 0;
+    const stockAwal = Math.max(0, baseStokAwal + masukSebelumTahun - keluarSebelumTahun);
+
     const mMasuk = transaksiMasukList
       .filter(t => {
-        const year = new Date(t.tanggal).getFullYear();
-        return (year === selectedYear || isNaN(year)) &&
+        const year = getYearFromDate(t.tanggal);
+        return (year === selectedYear || (isNaN(year) && selectedYear === 2026)) &&
           Array.isArray(t.items) &&
           t.items.some(isMatch);
       })
@@ -163,8 +197,8 @@ export default function KartuKendaliPage() {
       .filter(t => {
         // Hanya transaksi yang sudah disetujui admin yang memotong kartu kendali
         if (t.status === 'pending' || t.status === 'rejected') return false;
-        const year = new Date(t.tanggal).getFullYear();
-        return (year === selectedYear || isNaN(year)) &&
+        const year = getYearFromDate(t.tanggal);
+        return (year === selectedYear || (isNaN(year) && selectedYear === 2026)) &&
           Array.isArray(t.items) &&
           t.items.some(isMatch);
       })
@@ -198,7 +232,7 @@ export default function KartuKendaliPage() {
     const totalMasuk = entries.reduce((s, e) => s + e.masuk, 0);
     const totalKeluar = entries.reduce((s, e) => s + e.keluar, 0);
     let sisaAkhir = entries.length > 0 ? entries[entries.length - 1].sisa : stockAwal;
-    if (targetBarang?.stok !== undefined && targetBarang.stok === 0 && mMasuk.length === 0) {
+    if (stockAwal === 0 && targetBarang?.stok !== undefined && targetBarang.stok === 0 && mMasuk.length === 0) {
       sisaAkhir = 0;
     }
 
@@ -291,6 +325,11 @@ export default function KartuKendaliPage() {
     const matchKategori = filterKategori === 'all' || c.barang.kategori?.nama_kategori === filterKategori;
     return matchSearch && matchMutasi && matchKategori;
   });
+
+  const availableYears = getAvailableYears([
+    ...transaksiMasukList.map(t => t.tanggal),
+    ...transaksiKeluarList.map(t => t.tanggal),
+  ]);
 
   // Handler cetak dokumen bersih (tanpa tulisan SIPERSEDIA di header browser)
   const handlePrint = () => {
@@ -413,14 +452,6 @@ export default function KartuKendaliPage() {
               <tr className={cn('text-black font-semibold', isPrint ? 'h-4 print:h-[20px]' : 'h-7')}>
                 {BULAN_NAMES.map((_, idx) => {
                   const out = c.pengeluaran_bulanan[idx];
-                  if (idx === 0) {
-                    const val = out > 0 ? out : (c.stock_awal_tahun > 0 ? c.stock_awal_tahun : '');
-                    return (
-                      <td key={idx} className="border border-black py-0.5">
-                        {val}
-                      </td>
-                    );
-                  }
                   return (
                     <td key={idx} className="border border-black py-0.5">
                       {out > 0 ? out : ''}
@@ -494,15 +525,31 @@ export default function KartuKendaliPage() {
                   <tr key={rIdx} className={cn('text-black hover:bg-gray-50/50', isPrint ? 'h-[16px] print:h-[21px]' : 'h-[21px]')}>
                     {/* Sisi Kiri */}
                     {isPindahanRow ? (
-                      <>
-                        <td className="border border-black px-1 py-0 text-center"></td>
-                        <td className="border border-black px-1 py-0 font-mono text-[8.5px]"></td>
-                        <td className="border border-black px-1 py-0 text-center"></td>
-                        <td className="border border-black px-1.5 py-0 font-medium"></td>
-                        <td className="border border-black px-1 py-0 text-center"></td>
-                        <td className="border border-black px-1 py-0 text-center"></td>
-                        <td className="border border-black px-1 py-0 text-center"></td>
-                      </>
+                      c.stock_awal_tahun > 0 ? (
+                        <>
+                          <td className="border border-black px-1 py-0 text-center font-medium">-</td>
+                          <td className="border border-black px-1 py-0 font-mono text-[8px] text-center">-</td>
+                          <td className="border border-black px-1 py-0 text-center text-[8px]">01/01</td>
+                          <td className="border border-black px-1.5 py-0 font-bold italic text-dark-800">
+                            Saldo Awal 1 Jan {c.tahun}
+                          </td>
+                          <td className="border border-black px-1 py-0 text-center font-bold text-emerald-800">-</td>
+                          <td className="border border-black px-1 py-0 text-center font-bold text-rose-800">-</td>
+                          <td className="border border-black px-1 py-0 text-center font-extrabold text-blue-900 bg-blue-50/30">
+                            {c.stock_awal_tahun}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="border border-black px-1 py-0 text-center"></td>
+                          <td className="border border-black px-1 py-0 font-mono text-[8.5px]"></td>
+                          <td className="border border-black px-1 py-0 text-center"></td>
+                          <td className="border border-black px-1.5 py-0 font-medium"></td>
+                          <td className="border border-black px-1 py-0 text-center"></td>
+                          <td className="border border-black px-1 py-0 text-center"></td>
+                          <td className="border border-black px-1 py-0 text-center"></td>
+                        </>
+                      )
                     ) : (
                       <>
                         <td className="border border-black px-1 py-0 text-center font-medium">
@@ -581,16 +628,17 @@ export default function KartuKendaliPage() {
     (b.kode_barang && b.kode_barang.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const filteredDaftarPersediaan = availableBarangList
-    .filter(b => Number(b.stok || 0) > 0)
-    .map((b, idx) => ({
+  const filteredDaftarPersediaan = allCardsList
+    .filter(c => Number(c.sisaAkhir || 0) > 0 || Number(c.stock_awal_tahun || 0) > 0 || c.totalMasuk > 0)
+    .map((c, idx) => ({
       nomor: idx + 1,
-      kode: b.kode_barang,
-      uraian: b.nama_barang,
-      saldo_1_januari: 0,
-      masuk: b.stok,
-      keluar: 0,
-      satuan: b.satuan?.nama_satuan || 'Buah',
+      kode: c.kode_barang,
+      uraian: c.nama_barang,
+      saldo_1_januari: c.stock_awal_tahun,
+      masuk: c.totalMasuk,
+      keluar: c.totalKeluar,
+      satuan: c.satuan,
+      sisa: c.sisaAkhir,
     }))
     .filter(item =>
       item.uraian.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -611,7 +659,11 @@ export default function KartuKendaliPage() {
   // ========================================
   const handleOpenInputModal = (jenis: 'masuk' | 'keluar') => {
     setInputJenis(jenis);
-    setInputTanggal(new Date().toISOString().split('T')[0]);
+    const today = new Date();
+    const defaultDate = today.getFullYear() === selectedYear
+      ? today.toISOString().split('T')[0]
+      : `${selectedYear}-01-01`;
+    setInputTanggal(defaultDate);
     setInputNoReferensi('');
     setInputJumlah(1);
     setInputUraian('');
@@ -825,8 +877,11 @@ export default function KartuKendaliPage() {
               onChange={(e) => setSelectedYear(Number(e.target.value))}
               className="text-xs font-bold text-dark-700 bg-transparent py-1 pr-3 focus:outline-none cursor-pointer"
             >
-              <option value={2025}>Tahun Anggaran 2025 (PDF 1)</option>
-              <option value={2026}>Tahun Anggaran 2026 (PDF 2)</option>
+              {availableYears.map(y => (
+                <option key={y} value={y}>
+                  Tahun Anggaran {y}{y === 2025 ? ' (PDF 1)' : y === 2026 ? ' (PDF 2)' : ''}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -1463,7 +1518,7 @@ export default function KartuKendaliPage() {
                     value={inputNoReferensi}
                     onChange={e => setInputNoReferensi(e.target.value)}
                     className="input py-2 text-xs w-full"
-                    placeholder={inputJenis === 'masuk' ? 'BAST/001/X/2026' : 'SPB/001/X/2026'}
+                    placeholder={inputJenis === 'masuk' ? `BAST/001/X/${selectedYear}` : `SPB/001/X/${selectedYear}`}
                   />
                 </div>
               </div>
