@@ -363,7 +363,7 @@ export default function LaporanPage() {
   return (
     <div className="page-enter space-y-6">
       {/* Konten Dashboard (Disembunyikan saat mencetak dokumen) */}
-      <div className="print:hidden space-y-6">
+      <div className="print:hidden no-print space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -706,15 +706,23 @@ export default function LaporanPage() {
 
             <style dangerouslySetInnerHTML={{
               __html: `
-              /* Margin 0 ini yang berfungsi menghapus header/footer tanggal dan URL dari browser */
+              /* Margin cetak proporsional A4: halaman 2 dan seterusnya tidak mepet ke tepi atas kertas */
               @page {
                 size: A4 portrait;
-                margin: 0; 
+                margin: 10mm 10mm 10mm 10mm; 
               }
               @media print {
                 @page {
                   size: A4 portrait;
-                  margin: 0;
+                  margin: 10mm 10mm 10mm 10mm;
+                }
+                .no-print,
+                .print\\:hidden,
+                header,
+                aside,
+                nav,
+                footer {
+                  display: none !important;
                 }
                 html, body {
                   margin: 0 !important;
@@ -728,7 +736,8 @@ export default function LaporanPage() {
                   break-inside: avoid !important;
                 }
                 #print-area {
-                  padding: 8mm 8mm 8mm 8mm !important; 
+                  padding: 0 !important; 
+                  margin: 0 !important;
                   width: 100% !important;
                   display: block !important; 
                   box-sizing: border-box !important;
@@ -736,9 +745,17 @@ export default function LaporanPage() {
                 table {
                   page-break-inside: auto !important;
                 }
+                thead {
+                  display: table-header-group !important;
+                }
                 tr {
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
+                }
+                .signature-block {
+                  page-break-inside: avoid !important;
+                  break-inside: avoid !important;
+                  margin-top: 16px !important;
                 }
               }
             `}} />
