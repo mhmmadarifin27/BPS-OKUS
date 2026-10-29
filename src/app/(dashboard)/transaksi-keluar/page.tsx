@@ -34,8 +34,12 @@ export default function TransaksiKeluarPage() {
   const [tglCetakDokumen, setTglCetakDokumen] = useState(() => new Date().toISOString().split('T')[0]);
   const [editItem, setEditItem] = useState<TransaksiKeluar | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
-  const [pjEditTarget, setPjEditTarget] = useState<TransaksiKeluar | null>(null);
-  const [pjEditTim, setPjEditTim] = useState<string>('');
+  const [editDocTarget, setEditDocTarget] = useState<TransaksiKeluar | null>(null);
+  const [editDocNo, setEditDocNo] = useState<string>('');
+  const [editDocTanggal, setEditDocTanggal] = useState<string>('');
+  const [editDocTim, setEditDocTim] = useState<string>('');
+  const [editDocKeterangan, setEditDocKeterangan] = useState<string>('');
+  const [editDocItems, setEditDocItems] = useState<FormItem[]>([]);
 
   const [timList, setTimList] = useState<TimPemohon[]>(() => {
     if (typeof window !== 'undefined') {
@@ -139,7 +143,7 @@ export default function TransaksiKeluarPage() {
 
     // Polling sync berkala setiap 5 detik agar input dari teman/pegawai lain otomatis masuk ke admin
     const syncInterval = setInterval(() => {
-      // Jangan overwrite stok jika sedang ada proses update
+      // Jangan overwrite stok / dokumen yang sedang diedit atau di-update
       if (!(window as any).__stockUpdating) {
         fetchAndSyncBarang().then((cloudBarang) => {
           if (cloudBarang) {
@@ -147,12 +151,12 @@ export default function TransaksiKeluarPage() {
             setBarangList(cloudBarang);
           }
         });
+        fetchAndSyncTransaksiKeluar(loadedBarang).then((synced) => {
+          if (synced) {
+            setTransaksiList(synced);
+          }
+        });
       }
-      fetchAndSyncTransaksiKeluar(loadedBarang).then((synced) => {
-        if (synced) {
-          setTransaksiList(synced);
-        }
-      });
     }, 5000);
 
     // Listen for tim list updates
@@ -303,40 +307,200 @@ export default function TransaksiKeluarPage() {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  // Buka modal perbaikan Tim / Penanggung Jawab untuk dokumen yang sudah diajukan
-  const handleOpenPJEdit = (trx: TransaksiKeluar) => {
+  // Buka modal edit lengkap dokumen yang sudah diajukan
+  // (No. Dokumen, Tanggal, Barang, Jumlah, Pemohon & Tim)
+  const handleOpenDocEdit = (trx: TransaksiKeluar) => {
     const match = timList.find(t => t.id === trx.tim_pemohon) ||
       timList.find(t => t.nama_tim === trx.nama_tim);
-    setPjEditTim(match?.id || timList[0]?.id || '');
-    setPjEditTarget(trx);
+    setEditDocTim(match?.id || timList[0]?.id || '');
+    setEditDocNo(trx.no_dokumen);
+    setEditDocTanggal((trx.tanggal || new Date().toISOString().split('T')[0]).slice(0, 10));
+    setEditDocKeterangan(trx.keterangan || '');
+    setEditDocItems(
+      trx.items && trx.items.length > 0
+        ? trx.items.map(it => ({ id_barang: it.id_barang, jumlah: it.jumlah, keterangan: it.keterangan || '' }))
+        : [{ id_barang: barangList[0]?.id || mockBarang[0]?.id || 1, jumlah: 1, keterangan: '' }]
+    );
+    setEditDocTarget(trx);
   };
 
-  // Simpan perbaikan Penanggung Jawab (tidak menyentuh item / stok)
-  const handleSavePJEdit = async () => {
-    if (!pjEditTarget) return;
-    const timObj = timList.find(t => t.id === pjEditTim) || timList[0];
-    if (!timObj) return;
+  const handleAddEditDocItemRow = () => {
+    setEditDocItems(prev => [
+      ...prev,
+      { id_barang: barangList[0]?.id || mockBarang[0]?.id || 1, jumlah: 1, keterangan: '' }
+    ]);
+  };
 
+  const handleRemoveEditDocItemRow = (index: number) => {
+    setEditDocItems(prev => (prev.length > 1 ? prev.filter((_, idx) => idx !== index) : prev));
+  };
+
+  const handleEditDocItemChange = (index: number, field: keyof FormItem, value: any) => {
+    setEditDocItems(prev => prev.map((item, idx) => {
+      if (idx === index) return { ...item, [field]: value };
+      return item;
+    }));
+  };
+
+  // Simpan perubahan lengkap dokumen:
+  // - Nomor dokumen diunggah ke cloud; jika diganti, dokumen lama dihapus agar tidak dobel
+  // - Dokumen yang sudah disetujui otomatis menyesuaikan stok gudang (delta lama vs baru)
+  const handleSaveDocEdit = async () => {
+    if (!editDocTarget) return;
+
+    const noBaru = (editDocNo || '').trim();
+    if (!noBaru) {
+      setNotification({ type: 'error', message: 'Nomor dokumen tidak boleh kosong.' });
+      setTimeout(() => setNotification(null), 4000);
+      return;
+    }
+
+    const timObj = timList.find(t => t.id === editDocTim) ||
+      timList.find(t => t.id === editDocTarget.tim_pemohon);
+    if (!timObj) {
+      setNotification({ type: 'error', message: 'Tim pemohon tidak ditemukan. Silakan pilih ulang Tim & PJ.' });
+      setTimeout(() => setNotification(null), 4000);
+      return;
+    }
+
+    // Nomor dokumen harus unik (tidak dipakai dokumen lain)
+    const knownDocs = new Set<string>();
+    transaksiList.forEach(t => { if (t?.no_dokumen && t.id !== editDocTarget.id) knownDocs.add(t.no_dokumen); });
+    try {
+      const storedList = JSON.parse(localStorage.getItem('sipersedia_transaksi_keluar') || '[]');
+      if (Array.isArray(storedList)) {
+        storedList.forEach((t: any) => { if (t?.no_dokumen && String(t.id) !== String(editDocTarget.id)) knownDocs.add(t.no_dokumen); });
+      }
+    } catch {}
+    if (knownDocs.has(noBaru)) {
+      setNotification({
+        type: 'error',
+        message: `Nomor dokumen ${noBaru} sudah dipakai dokumen lain. Gunakan nomor yang berbeda.`,
+      });
+      setTimeout(() => setNotification(null), 4500);
+      return;
+    }
+
+    // Validasi stok: agregat jumlah per barang (semua baris digabung).
+    // Dokumen approved: stok saat ini sudah dikurangi jumlah lama dokumen ini,
+    // jadi batas atas = stok saat ini + jumlah lama. Dokumen pending: stok penuh.
+    const oldDocApproved = editDocTarget.status === 'approved';
+    const qtyPerBarang = new Map<number, number>();
+    editDocItems.forEach(fItem => {
+      const id = Number(fItem.id_barang);
+      if (!id) return;
+      qtyPerBarang.set(id, (qtyPerBarang.get(id) || 0) + (Number(fItem.jumlah) || 0));
+    });
+    const oldQtyPerBarang = new Map<number, number>();
+    (editDocTarget.items || []).forEach(it => {
+      oldQtyPerBarang.set(it.id_barang, (oldQtyPerBarang.get(it.id_barang) || 0) + (it.jumlah || 0));
+    });
+
+    for (const [bId, qty] of qtyPerBarang.entries()) {
+      const bObj = barangList.find(b => b.id === bId) || mockBarang.find(b => b.id === bId);
+      const maxAvailable = (bObj ? bObj.stok : 0) + (oldDocApproved ? (oldQtyPerBarang.get(bId) || 0) : 0);
+
+      if (qty <= 0) {
+        setNotification({
+          type: 'error',
+          message: `Jumlah untuk barang "${bObj?.nama_barang || `Item #${bId}`}" harus lebih dari 0.`,
+        });
+        setTimeout(() => setNotification(null), 4500);
+        return;
+      }
+
+      if (qty > maxAvailable) {
+        setNotification({
+          type: 'error',
+          message: `Jumlah untuk "${bObj?.nama_barang || `Item #${bId}`}" (${qty}) melebihi stok yang tersedia! Maksimal: ${maxAvailable} ${bObj?.satuan?.nama_satuan || 'unit'}.`,
+        });
+        setTimeout(() => setNotification(null), 5000);
+        return;
+      }
+    }
+
+    const preparedItems = editDocItems.map(fItem => {
+      const bObj = barangList.find(b => b.id === fItem.id_barang) || mockBarang.find(b => b.id === fItem.id_barang);
+      return {
+        id_barang: fItem.id_barang,
+        jumlah: Number(fItem.jumlah) || 1,
+        keterangan: (fItem.keterangan || '').trim(),
+        jenis_pengeluaran: editDocTarget.jenis_pengeluaran || 'habis_pakai',
+        barang: bObj,
+      };
+    });
+
+    const oldNo = editDocTarget.no_dokumen;
+    const noChanged = noBaru !== oldNo;
     const updatedTrx: TransaksiKeluar = {
-      ...pjEditTarget,
+      ...editDocTarget,
+      no_dokumen: noBaru,
+      tanggal: editDocTanggal,
       tim_pemohon: timObj.id,
       nama_tim: timObj.nama_tim,
       penanggung_jawab: formatNamaPJ(timObj.penanggung_jawab),
       nip_pj: timObj.nip_pj,
+      items: preparedItems,
+      keterangan: (editDocKeterangan || '').trim(),
     };
-    const updatedList = transaksiList.map(t => t.id === pjEditTarget.id ? updatedTrx : t);
+
+    // Simpan lokal dulu agar UI langsung update
+    const updatedList = transaksiList.map(t => t.id === editDocTarget.id ? updatedTrx : t);
     setTransaksiList(updatedList);
     localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify(updatedList));
+    // Tutup preview cetak jika dokumen yang diedit sedang dibuka (agar tidak menampilkan data lama)
+    setShowPrintPreview(prev => (prev && prev.id === editDocTarget.id ? null : prev));
 
-    // Sinkronkan perbaikan ke cloud (force update pada nomor dokumen yang sama)
-    pushTransaksiKeluar({ ...updatedTrx, force_update: true } as any);
+    (window as any).__stockUpdating = true;
+    try {
+      // 1) Kirim dokumen terbaru ke cloud (force update jika nomor tidak berubah)
+      await pushTransaksiKeluar({ ...updatedTrx, force_update: !noChanged } as any);
 
-    setPjEditTarget(null);
+      // 2) Jika nomor dokumen diganti, hapus record lama di cloud agar tidak dobel
+      if (noChanged) {
+        await deleteTransaksiKeluarRemote(oldNo);
+      }
+
+      // 3) Dokumen yang sudah disetujui: sesuaikan stok gudang (lama vs baru)
+      if (oldDocApproved) {
+        const deltaMap = new Map<number, number>();
+        oldQtyPerBarang.forEach((q, id) => deltaMap.set(id, (deltaMap.get(id) || 0) + q));
+        qtyPerBarang.forEach((q, id) => deltaMap.set(id, (deltaMap.get(id) || 0) - q));
+
+        const nextBarang = [...barangList];
+        const stockUpdates: Promise<boolean>[] = [];
+        deltaMap.forEach((delta, bId) => {
+          if (!delta) return;
+          const idx = nextBarang.findIndex(b => b.id === bId);
+          if (idx === -1) return;
+          const newStock = Math.max(0, nextBarang[idx].stok + delta); // positif = kembali, negatif = keluar
+          stockUpdates.push(updateBarangStockRemote(bId, newStock));
+          nextBarang[idx] = { ...nextBarang[idx], stok: newStock };
+        });
+        if (stockUpdates.length > 0) {
+          setBarangList(nextBarang);
+          localStorage.setItem('sipersedia_barang_list', JSON.stringify(nextBarang));
+          await Promise.all(stockUpdates);
+        }
+      }
+    } finally {
+      (window as any).__stockUpdating = false;
+    }
+
+    // Laporan & rekap cache harus dihitung ulang karena data berubah
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith('sipersedia_laporan_data_')) localStorage.removeItem(k);
+    });
+
+    setEditDocTarget(null);
     setNotification({
       type: 'success',
-      message: `Penanggung Jawab dokumen ${updatedTrx.no_dokumen} diperbarui menjadi ${updatedTrx.penanggung_jawab}.`,
+      message:
+        `Dokumen ${noBaru} berhasil diperbarui` +
+        (noChanged ? ` (nomor lama ${oldNo} diganti)` : '') +
+        (oldDocApproved ? ' & stok gudang otomatis disesuaikan.' : '.'),
     });
-    setTimeout(() => setNotification(null), 4000);
+    setTimeout(() => setNotification(null), 4500);
   };
 
   const handleAddItemRow = () => {
@@ -729,14 +893,14 @@ export default function TransaksiKeluarPage() {
                         </>
                       )}
 
-                      {/* Tombol perbaikan Tim / Penanggung Jawab untuk yang sudah diajukan */}
+                      {/* Tombol edit lengkap dokumen (No. Dokumen, Barang, Jumlah, Pemohon & Tim) */}
                       <button
-                        onClick={() => handleOpenPJEdit(trx)}
+                        onClick={() => handleOpenDocEdit(trx)}
                         className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors shadow-xs"
-                        title="Salah pilih PJ? Ubah Tim / Penanggung Jawab dokumen ini"
+                        title="Edit dokumen: No. Dokumen, Barang, Satuan, Jumlah, Pemohon & Tim"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
-                        <span>Ubah PJ</span>
+                        <span>Edit</span>
                       </button>
 
                       {/* Tombol Cetak Surat Permintaan Barang */}
@@ -987,45 +1151,70 @@ export default function TransaksiKeluarPage() {
       )}
       </div>
 
-      {/* Modal Perbaikan Tim / Penanggung Jawab (PJ) */}
-      {pjEditTarget && (
+      {/* Modal Edit Dokumen (No. Dokumen, Tanggal, Barang, Satuan, Jumlah, Pemohon & Tim) */}
+      {editDocTarget && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-y-auto animate-slide-in-up">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[92vh] overflow-y-auto animate-slide-in-up">
             <div className="flex items-center justify-between p-5 border-b border-dark-100 sticky top-0 bg-white z-10">
               <div>
-                <h2 className="text-lg font-bold text-dark-800">Ubah Tim / Penanggung Jawab (PJ)</h2>
+                <h2 className="text-lg font-bold text-dark-800">Edit Dokumen Permintaan</h2>
                 <p className="text-xs text-dark-400 mt-0.5">
-                  Perbaikan untuk dokumen <span className="font-mono font-semibold text-bps-blue">{pjEditTarget.no_dokumen}</span>
+                  Perbaikan untuk dokumen <span className="font-mono font-semibold text-bps-blue">{editDocTarget.no_dokumen}</span>
                 </p>
               </div>
-              <button onClick={() => setPjEditTarget(null)} className="p-1.5 rounded-lg text-dark-400 hover:bg-dark-50">
+              <button onClick={() => setEditDocTarget(null)} className="p-1.5 rounded-lg text-dark-400 hover:bg-dark-50">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-5 space-y-4">
-              {/* Info PJ saat ini */}
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs space-y-1">
+              {/* Info status dokumen */}
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs">
                 <p className="font-bold text-amber-800 flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" /> PJ saat ini (belum/bisa salah pilih):
+                  <AlertTriangle className="w-3.5 h-3.5" /> Dokumen sudah diajukan
                 </p>
-                <p className="text-dark-700">
-                  <span className="font-medium">Tim:</span> {pjEditTarget.nama_tim}
-                </p>
-                <p className="text-dark-700">
-                  <span className="font-medium">PJ:</span> <span className="font-bold">{pjEditTarget.penanggung_jawab}</span>
-                  <span className="text-dark-400"> — NIP: <span className="font-mono">{pjEditTarget.nip_pj}</span></span>
+                <p className="text-dark-600 mt-1 leading-relaxed">
+                  {editDocTarget.status === 'approved'
+                    ? 'Dokumen ini sudah disetujui. Setelah disimpan, stok gudang otomatis disesuaikan mengikuti perubahan (barang dikurangi / dikembalikan sesuai selisih).'
+                    : 'Semua isian dapat diperbaiki di sini: nomor dokumen, barang, jumlah, maupun Pemohon & Tim. Stok gudang belum berubah karena permintaan ini belum disetujui.'}
                 </p>
               </div>
 
-              {/* Pilihan PJ baru */}
-              <div>
+              {/* No. Dokumen & Tanggal */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="input-label text-xs font-semibold text-dark-700">
+                    No. Dokumen <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input text-xs font-mono font-semibold text-bps-blue"
+                    value={editDocNo}
+                    onChange={(e) => setEditDocNo(e.target.value)}
+                    placeholder="Contoh: BK-2026/10/001"
+                  />
+                </div>
+                <div>
+                  <label className="input-label text-xs font-semibold text-dark-700">
+                    Tanggal Dokumen <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="input text-xs"
+                    value={editDocTanggal}
+                    onChange={(e) => setEditDocTanggal(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Pemohon & Tim (Penanggung Jawab) */}
+              <div className="space-y-2">
                 <label className="input-label text-xs font-semibold text-dark-700">
-                  Tim Pemohon & Penanggung Jawab Baru <span className="text-red-500">*</span>
+                  Pemohon &amp; Tim (Penanggung Jawab) <span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={pjEditTim}
-                  onChange={(e) => setPjEditTim(e.target.value)}
+                  value={editDocTim}
+                  onChange={(e) => setEditDocTim(e.target.value)}
                   className="input text-xs font-medium text-dark-800"
                 >
                   {timList.map(t => (
@@ -1034,36 +1223,168 @@ export default function TransaksiKeluarPage() {
                     </option>
                   ))}
                 </select>
+                {(() => {
+                  const activeTim = timList.find(t => t.id === editDocTim) || timList[0];
+                  if (!activeTim) return null;
+                  return (
+                    <div className="p-2.5 bg-bps-blue-50/70 rounded-xl border border-bps-blue/20 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs animate-fade-in">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-dark-500 font-medium">PJ:</span>
+                        <span className="font-bold text-dark-800">{formatNamaPJ(activeTim.penanggung_jawab)}</span>
+                      </div>
+                      <div className="text-dark-500 text-[11px]">
+                        NIP: <span className="font-mono font-semibold text-dark-700">{activeTim.nip_pj}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
-              {/* Info PJ baru */}
-              {(() => {
-                const activeTim = timList.find(t => t.id === pjEditTim) || timList[0];
-                if (!activeTim) return null;
-                return (
-                  <div className="p-2.5 bg-bps-blue-50/70 rounded-xl border border-bps-blue/20 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs animate-fade-in">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-dark-500 font-medium">PJ Baru:</span>
-                      <span className="font-bold text-dark-800">{formatNamaPJ(activeTim.penanggung_jawab)}</span>
-                    </div>
-                    <div className="text-dark-500 text-[11px]">
-                      NIP: <span className="font-mono font-semibold text-dark-700">{activeTim.nip_pj}</span>
-                    </div>
-                  </div>
-                );
-              })()}
+              {/* Rincian barang: nama barang, satuan (otomatis mengikuti barang), jumlah */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="input-label mb-0">Rincian Barang &amp; Jumlah</label>
+                  <button
+                    type="button"
+                    onClick={handleAddEditDocItemRow}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-bps-blue hover:text-bps-blue-700 bg-bps-blue-50 px-2.5 py-1 rounded-lg border border-bps-blue/20 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Tambah Barang</span>
+                  </button>
+                </div>
 
-              <p className="text-[11px] text-dark-400 leading-relaxed">
-                Perubahan hanya mengganti Tim & Penanggung Jawab pada surat permintaan ini.
-                Daftar barang, jumlah, dan stok gudang tidak ikut berubah.
-              </p>
+                <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
+                  {editDocItems.map((fItem, idx) => (
+                    <div key={idx} className="p-3 bg-dark-50/70 border border-dark-100 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-dark-500 uppercase tracking-wide">
+                          Item #{idx + 1}
+                        </span>
+                        {editDocItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEditDocItemRow(idx)}
+                            className="p-1 rounded-md text-red-500 hover:bg-red-50 transition-colors"
+                            title="Hapus baris barang ini"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="input-label text-[11px] font-semibold text-dark-600 mb-1">
+                          Nama Barang Persediaan <span className="text-red-500">*</span>
+                        </label>
+                        <SearchableSelect
+                          options={barangList.map(b => ({
+                            value: b.id,
+                            label: `[${b.kode_barang}] ${b.nama_barang}`,
+                            sub: `Sisa Stok: ${b.stok} ${b.satuan?.nama_satuan || 'Buah'}`,
+                          }))}
+                          value={fItem.id_barang}
+                          onChange={(v) => handleEditDocItemChange(idx, 'id_barang', Number(v))}
+                          placeholder="Pilih barang persediaan..."
+                          searchPlaceholder="Cari kode / nama barang..."
+                          emptyMessage="Barang tidak ditemukan"
+                        />
+                      </div>
+
+                      {(() => {
+                        const selBarang = barangList.find(b => b.id === fItem.id_barang) || mockBarang.find(b => b.id === fItem.id_barang);
+                        const oldApprovedQty = editDocTarget?.status === 'approved'
+                          ? (editDocTarget.items || [])
+                              .filter(it => it.id_barang === fItem.id_barang)
+                              .reduce((s, it) => s + (it.jumlah || 0), 0)
+                          : 0;
+                        const otherRowsQty = editDocItems.reduce(
+                          (s, row, rIdx) => (rIdx !== idx && row.id_barang === fItem.id_barang ? s + (Number(row.jumlah) || 0) : s),
+                          0
+                        );
+                        const maxAvailable = Math.max(0, (selBarang ? selBarang.stok : 0) + oldApprovedQty - otherRowsQty);
+                        const isOver = (Number(fItem.jumlah) || 0) > maxAvailable;
+
+                        return (
+                          <div className="space-y-1.5">
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="input-label text-[11px] font-semibold text-dark-600 mb-1">
+                                  Jumlah <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max={maxAvailable}
+                                  className={cn(
+                                    "input text-xs transition-colors",
+                                    isOver ? "border-red-500 bg-red-50 text-red-700 font-bold focus:ring-red-400" : ""
+                                  )}
+                                  value={fItem.jumlah}
+                                  onChange={(e) => handleEditDocItemChange(idx, 'jumlah', Number(e.target.value))}
+                                  placeholder="Jumlah"
+                                />
+                              </div>
+                              <div>
+                                <label className="input-label text-[11px] font-semibold text-dark-600 mb-1">
+                                  Satuan
+                                </label>
+                                <div
+                                  className="input text-xs bg-dark-100/70 text-dark-500 font-medium flex items-center"
+                                  title="Satuan otomatis mengikuti barang yang dipilih"
+                                >
+                                  {selBarang?.satuan?.nama_satuan || '-'}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="input-label text-[11px] font-semibold text-dark-600 mb-1">
+                                  Keterangan (opsional)
+                                </label>
+                                <input
+                                  type="text"
+                                  className="input text-xs"
+                                  value={fItem.keterangan || ''}
+                                  onChange={(e) => handleEditDocItemChange(idx, 'keterangan', e.target.value)}
+                                  placeholder="Catatan item"
+                                />
+                              </div>
+                            </div>
+                            <div className="text-[11px] px-1 flex items-center justify-between">
+                              {isOver ? (
+                                <span className="text-red-600 font-bold flex items-center gap-1 animate-pulse">
+                                  ⚠️ Melebihi stok! (Maks: {maxAvailable} {selBarang?.satuan?.nama_satuan || 'unit'})
+                                </span>
+                              ) : (
+                                <span className="text-dark-500 text-[10.5px]">
+                                  Batas tersedia: <strong className="text-dark-800">{maxAvailable}</strong> {selBarang?.satuan?.nama_satuan || 'unit'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Keperluan permintaan */}
+              <div>
+                <label className="input-label text-xs font-semibold text-dark-700">Catatan / Keperluan Permintaan</label>
+                <textarea
+                  className="input min-h-[55px] resize-none text-xs"
+                  value={editDocKeterangan}
+                  onChange={(e) => setEditDocKeterangan(e.target.value)}
+                  placeholder="Contoh: Kebutuhan Sakernas / Susenas / Pengarsipan Dokumen Lapangan..."
+                />
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-3 p-5 border-t border-dark-100 bg-dark-50 rounded-b-2xl">
-              <button onClick={() => setPjEditTarget(null)} className="btn-secondary">
+              <button onClick={() => setEditDocTarget(null)} className="btn-secondary">
                 Batal
               </button>
-              <button onClick={handleSavePJEdit} className="btn-primary">
+              <button onClick={handleSaveDocEdit} className="btn-primary">
                 <CheckCircle2 className="w-4 h-4" />
                 Simpan Perubahan
               </button>
