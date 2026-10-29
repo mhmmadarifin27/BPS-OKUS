@@ -348,6 +348,20 @@ export default function TransaksiKeluarPage() {
   const handleSaveDocEdit = async () => {
     if (!editDocTarget) return;
 
+    // Cegah race condition: jika selagi modal terbuka dokumen ini sudah
+    // disetujui/ditolak admin (status terbaru dari cloud), tolak penyimpanan.
+    const latestTrx = transaksiList.find(t => t.id === editDocTarget.id);
+    const latestStatus = latestTrx?.status || editDocTarget.status || 'approved';
+    if (latestStatus !== 'pending') {
+      setEditDocTarget(null);
+      setNotification({
+        type: 'error',
+        message: `Dokumen ${editDocTarget.no_dokumen} sudah diproses admin (${latestStatus === 'approved' ? 'disetujui' : 'ditolak'}) — tidak dapat diedit lagi.`,
+      });
+      setTimeout(() => setNotification(null), 5000);
+      return;
+    }
+
     const noBaru = (editDocNo || '').trim();
     if (!noBaru) {
       setNotification({ type: 'error', message: 'Nomor dokumen tidak boleh kosong.' });
@@ -893,15 +907,17 @@ export default function TransaksiKeluarPage() {
                         </>
                       )}
 
-                      {/* Tombol edit lengkap dokumen (No. Dokumen, Barang, Jumlah, Pemohon & Tim) */}
-                      <button
-                        onClick={() => handleOpenDocEdit(trx)}
-                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors shadow-xs"
-                        title="Edit dokumen: No. Dokumen, Barang, Satuan, Jumlah, Pemohon & Tim"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                        <span>Edit</span>
-                      </button>
+                      {/* Tombol edit lengkap dokumen — HANYA untuk yang belum disetujui/ditolak */}
+                      {status === 'pending' && (
+                        <button
+                          onClick={() => handleOpenDocEdit(trx)}
+                          className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors shadow-xs"
+                          title="Edit dokumen: No. Dokumen, Barang, Satuan, Jumlah, Pemohon & Tim"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                      )}
 
                       {/* Tombol Cetak Surat Permintaan Barang */}
                       <button
@@ -1171,12 +1187,12 @@ export default function TransaksiKeluarPage() {
               {/* Info status dokumen */}
               <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs">
                 <p className="font-bold text-amber-800 flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" /> Dokumen sudah diajukan
+                  <AlertTriangle className="w-3.5 h-3.5" /> Dokumen masih menunggu persetujuan
                 </p>
                 <p className="text-dark-600 mt-1 leading-relaxed">
-                  {editDocTarget.status === 'approved'
-                    ? 'Dokumen ini sudah disetujui. Setelah disimpan, stok gudang otomatis disesuaikan mengikuti perubahan (barang dikurangi / dikembalikan sesuai selisih).'
-                    : 'Semua isian dapat diperbaiki di sini: nomor dokumen, barang, jumlah, maupun Pemohon & Tim. Stok gudang belum berubah karena permintaan ini belum disetujui.'}
+                  Semua isian dapat diperbaiki di sini: nomor dokumen, barang, jumlah, maupun Pemohon &amp; Tim.
+                  Stok gudang belum berubah karena permintaan ini belum disetujui.
+                  Dokumen yang sudah <strong>disetujui</strong> atau <strong>ditolak</strong> tidak dapat diedit lagi.
                 </p>
               </div>
 
