@@ -10,6 +10,7 @@ import { TIM_PEMOHON_LIST, getStoredTimList, formatNamaPJ, TimPemohon } from '@/
 import type { TransaksiKeluar, Barang, JenisPengeluaran } from '@/types';
 import { cn, formatDateShort, formatDate, formatTanggalTandaTangan } from '@/lib/utils';
 import KopSurat from '@/components/KopSurat';
+import SearchableSelect from '@/components/SearchableSelect';
 import {
   fetchAndSyncTransaksiKeluar,
   pushTransaksiKeluar,
@@ -33,6 +34,8 @@ export default function TransaksiKeluarPage() {
   const [tglCetakDokumen, setTglCetakDokumen] = useState(() => new Date().toISOString().split('T')[0]);
   const [editItem, setEditItem] = useState<TransaksiKeluar | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
+  const [pjEditTarget, setPjEditTarget] = useState<TransaksiKeluar | null>(null);
+  const [pjEditTim, setPjEditTim] = useState<string>('');
 
   const [timList, setTimList] = useState<TimPemohon[]>(() => {
     if (typeof window !== 'undefined') {
@@ -296,6 +299,42 @@ export default function TransaksiKeluarPage() {
     setNotification({
       type: 'info',
       message: `Permintaan ${trx.no_dokumen} telah DITOLAK.`,
+    });
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  // Buka modal perbaikan Tim / Penanggung Jawab untuk dokumen yang sudah diajukan
+  const handleOpenPJEdit = (trx: TransaksiKeluar) => {
+    const match = timList.find(t => t.id === trx.tim_pemohon) ||
+      timList.find(t => t.nama_tim === trx.nama_tim);
+    setPjEditTim(match?.id || timList[0]?.id || '');
+    setPjEditTarget(trx);
+  };
+
+  // Simpan perbaikan Penanggung Jawab (tidak menyentuh item / stok)
+  const handleSavePJEdit = async () => {
+    if (!pjEditTarget) return;
+    const timObj = timList.find(t => t.id === pjEditTim) || timList[0];
+    if (!timObj) return;
+
+    const updatedTrx: TransaksiKeluar = {
+      ...pjEditTarget,
+      tim_pemohon: timObj.id,
+      nama_tim: timObj.nama_tim,
+      penanggung_jawab: formatNamaPJ(timObj.penanggung_jawab),
+      nip_pj: timObj.nip_pj,
+    };
+    const updatedList = transaksiList.map(t => t.id === pjEditTarget.id ? updatedTrx : t);
+    setTransaksiList(updatedList);
+    localStorage.setItem('sipersedia_transaksi_keluar', JSON.stringify(updatedList));
+
+    // Sinkronkan perbaikan ke cloud (force update pada nomor dokumen yang sama)
+    pushTransaksiKeluar({ ...updatedTrx, force_update: true } as any);
+
+    setPjEditTarget(null);
+    setNotification({
+      type: 'success',
+      message: `Penanggung Jawab dokumen ${updatedTrx.no_dokumen} diperbarui menjadi ${updatedTrx.penanggung_jawab}.`,
     });
     setTimeout(() => setNotification(null), 4000);
   };
@@ -690,6 +729,16 @@ export default function TransaksiKeluarPage() {
                         </>
                       )}
 
+                      {/* Tombol perbaikan Tim / Penanggung Jawab untuk yang sudah diajukan */}
+                      <button
+                        onClick={() => handleOpenPJEdit(trx)}
+                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors shadow-xs"
+                        title="Salah pilih PJ? Ubah Tim / Penanggung Jawab dokumen ini"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Ubah PJ</span>
+                      </button>
+
                       {/* Tombol Cetak Surat Permintaan Barang */}
                       <button
                         onClick={() => setShowPrintPreview(trx)}
@@ -744,23 +793,23 @@ export default function TransaksiKeluarPage() {
 
             <div className="p-5 space-y-4">
               <div className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="input-label text-xs font-semibold text-dark-700">
-                      Tim Pemohon & Penanggung Jawab (PJ) <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={selectedTim}
-                      onChange={(e) => setSelectedTim(e.target.value)}
-                      className="input text-xs font-medium text-dark-800"
-                    >
-                      {timList.map(t => (
-                        <option key={t.id} value={t.id}>
-                          {t.nama_tim} — PJ: {formatNamaPJ(t.penanggung_jawab)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className="input-label text-xs font-semibold text-dark-700">
+                    Tim Pemohon & Penanggung Jawab (PJ) <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={selectedTim}
+                    onChange={(e) => setSelectedTim(e.target.value)}
+                    className="input text-xs font-medium text-dark-800"
+                  >
+                    {timList.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.nama_tim} — PJ: {formatNamaPJ(t.penanggung_jawab)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="input-label text-xs font-semibold text-dark-700">
                       Tanggal Permintaan <span className="text-red-500">*</span>
@@ -842,18 +891,18 @@ export default function TransaksiKeluarPage() {
                         <label className="input-label text-[11px] font-semibold text-dark-600 mb-1">
                           Pilih Barang Persediaan <span className="text-red-500">*</span>
                         </label>
-                        <select
+                        <SearchableSelect
+                          options={barangList.map(b => ({
+                            value: b.id,
+                            label: `[${b.kode_barang}] ${b.nama_barang}`,
+                            sub: `Sisa Stok: ${b.stok} ${b.satuan?.nama_satuan || 'Buah'}`,
+                          }))}
                           value={fItem.id_barang}
-                          onChange={(e) => handleItemChange(idx, 'id_barang', Number(e.target.value))}
-                          className="input text-xs font-medium"
-                          required
-                        >
-                          {barangList.map(b => (
-                            <option key={b.id} value={b.id}>
-                              [{b.kode_barang}] {b.nama_barang} (Sisa Stok: {b.stok} {b.satuan?.nama_satuan || 'Buah'})
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(v) => handleItemChange(idx, 'id_barang', Number(v))}
+                          placeholder="Pilih barang persediaan..."
+                          searchPlaceholder="Cari kode / nama barang..."
+                          emptyMessage="Barang tidak ditemukan"
+                        />
                       </div>
 
                       {(() => {
@@ -937,6 +986,91 @@ export default function TransaksiKeluarPage() {
         </div>
       )}
       </div>
+
+      {/* Modal Perbaikan Tim / Penanggung Jawab (PJ) */}
+      {pjEditTarget && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-y-auto animate-slide-in-up">
+            <div className="flex items-center justify-between p-5 border-b border-dark-100 sticky top-0 bg-white z-10">
+              <div>
+                <h2 className="text-lg font-bold text-dark-800">Ubah Tim / Penanggung Jawab (PJ)</h2>
+                <p className="text-xs text-dark-400 mt-0.5">
+                  Perbaikan untuk dokumen <span className="font-mono font-semibold text-bps-blue">{pjEditTarget.no_dokumen}</span>
+                </p>
+              </div>
+              <button onClick={() => setPjEditTarget(null)} className="p-1.5 rounded-lg text-dark-400 hover:bg-dark-50">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Info PJ saat ini */}
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs space-y-1">
+                <p className="font-bold text-amber-800 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" /> PJ saat ini (belum/bisa salah pilih):
+                </p>
+                <p className="text-dark-700">
+                  <span className="font-medium">Tim:</span> {pjEditTarget.nama_tim}
+                </p>
+                <p className="text-dark-700">
+                  <span className="font-medium">PJ:</span> <span className="font-bold">{pjEditTarget.penanggung_jawab}</span>
+                  <span className="text-dark-400"> — NIP: <span className="font-mono">{pjEditTarget.nip_pj}</span></span>
+                </p>
+              </div>
+
+              {/* Pilihan PJ baru */}
+              <div>
+                <label className="input-label text-xs font-semibold text-dark-700">
+                  Tim Pemohon & Penanggung Jawab Baru <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={pjEditTim}
+                  onChange={(e) => setPjEditTim(e.target.value)}
+                  className="input text-xs font-medium text-dark-800"
+                >
+                  {timList.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.nama_tim} — PJ: {formatNamaPJ(t.penanggung_jawab)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Info PJ baru */}
+              {(() => {
+                const activeTim = timList.find(t => t.id === pjEditTim) || timList[0];
+                if (!activeTim) return null;
+                return (
+                  <div className="p-2.5 bg-bps-blue-50/70 rounded-xl border border-bps-blue/20 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs animate-fade-in">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-dark-500 font-medium">PJ Baru:</span>
+                      <span className="font-bold text-dark-800">{formatNamaPJ(activeTim.penanggung_jawab)}</span>
+                    </div>
+                    <div className="text-dark-500 text-[11px]">
+                      NIP: <span className="font-mono font-semibold text-dark-700">{activeTim.nip_pj}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <p className="text-[11px] text-dark-400 leading-relaxed">
+                Perubahan hanya mengganti Tim & Penanggung Jawab pada surat permintaan ini.
+                Daftar barang, jumlah, dan stok gudang tidak ikut berubah.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-5 border-t border-dark-100 bg-dark-50 rounded-b-2xl">
+              <button onClick={() => setPjEditTarget(null)} className="btn-secondary">
+                Batal
+              </button>
+              <button onClick={handleSavePJEdit} className="btn-primary">
+                <CheckCircle2 className="w-4 h-4" />
+                Simpan Perubahan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Print Preview — SURAT PERMINTAAN BARANG ATK/CETAKAN/DLL (Persis Format Gambar) */}
       {showPrintPreview && (

@@ -103,14 +103,30 @@ export async function POST(req: Request) {
     if (existingDoc) {
       const isStatusUpdate = Boolean(body.status && body.status !== existingDoc.status);
       const isSameRecord = Boolean(body.id && String(body.id) === String(existingDoc.id));
+      const isForcedUpdate = Boolean(body.force_update);
 
-      if (isStatusUpdate || isSameRecord) {
+      if (isStatusUpdate || isSameRecord || isForcedUpdate) {
         // Pembaruan status (approval / rejection / edit) pada dokumen yang sama
         const updateData: any = {
           status: body.status || existingDoc.status,
         };
         if (body.approved_by) updateData.approved_by = body.approved_by;
-        if (body.keterangan) {
+        // Edit dokumen (mis. perbaikan Penanggung Jawab / tim pemohon)
+        if (body.tanggal) updateData.tanggal = body.tanggal;
+        if (body.nama_tim) updateData.tujuan = body.nama_tim;
+        if (body.penanggung_jawab) updateData.pemohon = body.penanggung_jawab;
+        if (Array.isArray(body.items) && body.items.length > 0) {
+          // Pertahankan metadata dokumen lengkap (items multi-barang, jenis, PJ, dll.)
+          updateData.keterangan = JSON.stringify({
+            note: body.keterangan || '',
+            jenis_pengeluaran: body.jenis_pengeluaran || 'habis_pakai',
+            tim_pemohon: body.tim_pemohon || 'tim-sosial',
+            nama_tim: body.nama_tim || 'Tim Sosial',
+            penanggung_jawab: body.penanggung_jawab || 'Pegawai',
+            nip_pj: body.nip_pj || '-',
+            items: body.items,
+          });
+        } else if (body.keterangan) {
           updateData.keterangan = typeof body.keterangan === 'string'
             ? body.keterangan
             : JSON.stringify(body.keterangan);
