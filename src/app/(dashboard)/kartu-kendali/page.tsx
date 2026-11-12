@@ -307,8 +307,14 @@ export default function KartuKendaliPage() {
 
   // Daftar kartu kendali untuk seluruh master barang
   const allCardsRaw = (barangList || []).map(b => computeSingleCard(b));
-  // Kartu barang aktif (fallback ke seluruh barang jika tidak ada yang stok > 0)
-  const activeStockCards = allCardsRaw.filter(c => Number(c.sisaAkhir || 0) > 0);
+  // ponytail: kartu barang aktif tampil jika ada sisa stok, saldo 1 Jan, atau ada riwayat mutasi (masuk/keluar)
+  const activeStockCards = allCardsRaw.filter(c =>
+    Number(c.sisaAkhir || 0) > 0 ||
+    Number(c.stock_awal_tahun || 0) > 0 ||
+    Number(c.totalMasuk || 0) > 0 ||
+    Number(c.totalKeluar || 0) > 0 ||
+    c.entries.length > 0
+  );
   const allCardsList = activeStockCards.length > 0 ? activeStockCards : allCardsRaw;
 
   // Daftar barang yang tersedia untuk dipilih
@@ -671,7 +677,13 @@ export default function KartuKendaliPage() {
   );
 
   const filteredDaftarPersediaan = allCardsList
-    .filter(c => Number(c.sisaAkhir || 0) > 0 || Number(c.stock_awal_tahun || 0) > 0 || c.totalMasuk > 0)
+    .filter(c =>
+      Number(c.sisaAkhir || 0) > 0 ||
+      Number(c.stock_awal_tahun || 0) > 0 ||
+      Number(c.totalMasuk || 0) > 0 ||
+      Number(c.totalKeluar || 0) > 0 ||
+      c.entries.length > 0
+    )
     .map((c, idx) => ({
       nomor: idx + 1,
       kode: c.kode_barang,

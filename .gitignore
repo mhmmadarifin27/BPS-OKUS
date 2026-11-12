@@ -32,6 +32,7 @@ yarn-error.log*
 
 # local backups
 backup-*.json
+*.mp4
 
 # typescript
 *.tsbuildinfo

@@ -322,9 +322,15 @@ export default function LaporanPage() {
     setTimeout(() => setToastNotification(null), 3000);
   };
 
-  // STRICT FILTER: Barang yang total persediaannya 0 (habis) dihilangkan dari laporan & nomor urut berurutan runtut
+  // ponytail: barang tampil jika ada saldo awal, transaksi masuk/keluar pada periode ini, atau sisa persediaan fisik
   const activeReportData = reportData
-    .filter((item) => Number(item.total_persediaan || 0) > 0)
+    .filter((item) =>
+      Number(item.saldo_juli || 0) > 0 ||
+      Number(item.pembelian || 0) > 0 ||
+      Number(item.transfer_masuk || 0) > 0 ||
+      Number(item.pengeluaran || 0) > 0 ||
+      Number(item.total_persediaan || 0) > 0
+    )
     .map((item, idx) => ({ ...item, no: idx + 1 }));
 
   // Ringkasan Total bersumber dari activeReportData
