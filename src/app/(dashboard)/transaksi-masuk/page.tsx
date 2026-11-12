@@ -1475,7 +1475,7 @@ export default function TransaksiMasukPage() {
                 <thead>
                   <tr className="bg-gray-100 text-black font-bold">
                     <th className="border border-black px-2 py-2 print:py-2.5 text-center w-10">No</th>
-                    <th className="border border-black px-3 py-2 print:py-2.5 text-center">Nama Barang</th>
+                    <th className="border border-black px-3 py-2 print:py-2.5 text-left">Nama Barang</th>
                     <th className="border border-black px-3 py-2 print:py-2.5 text-center w-28 print:w-32">Satuan</th>
                     <th className="border border-black px-3 py-2 print:py-2.5 text-center w-24 print:w-28">Jumlah</th>
                     <th className="border border-black px-3 py-2 print:py-2.5 text-center">Keterangan</th>

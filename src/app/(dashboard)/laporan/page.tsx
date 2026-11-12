@@ -812,7 +812,7 @@ export default function LaporanPage() {
                   <thead>
                     <tr className="bg-gray-100 text-black font-bold text-center leading-tight">
                       <th style={{ width: '4%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">No.</th>
-                      <th style={{ width: '26%', overflow: 'hidden' }} className="border border-black px-1.5 py-1.5 text-center">Uraian Barang</th>
+                      <th style={{ width: '26%', overflow: 'hidden' }} className="border border-black px-1.5 py-1.5 text-left">Uraian Barang</th>
                       <th style={{ width: '7%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Satuan</th>
                       <th style={{ width: '9%', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">{getSaldoAwalHeader(bulan, tahun)}</th>
                       <th style={{ width: '8%', whiteSpace: 'nowrap', overflow: 'hidden' }} className="border border-black px-1 py-1.5 text-center">Pembelian</th>
@@ -863,7 +863,7 @@ export default function LaporanPage() {
                   <thead>
                     <tr className="bg-gray-100 text-black font-bold text-center leading-tight">
                       <th rowSpan={2} style={{ width: '3.5%' }} className="border border-black px-1 py-1">No.</th>
-                      <th rowSpan={2} style={{ width: '23.5%' }} className="border border-black px-1.5 py-1 text-center">Uraian Barang</th>
+                      <th rowSpan={2} style={{ width: '23.5%' }} className="border border-black px-1.5 py-1 text-left">Uraian Barang</th>
                       <th rowSpan={2} style={{ width: '8%' }} className="border border-black px-1 py-1 text-center">Pengeluaran</th>
                       <th colSpan={7} style={{ width: '49%' }} className="border border-black px-1 py-1 text-center">Rincian Tim Kerja</th>
                       <th rowSpan={2} style={{ width: '8%' }} className="border border-black px-1 py-1 text-center">Satuan</th>
